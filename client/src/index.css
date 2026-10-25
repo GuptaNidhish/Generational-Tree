@@ -76,3 +76,81 @@ body {
 .react-flow__edge.dimmed {
   opacity: 0.2;
 }
+
+/* ── Scroll-to-explore reveals ───────────────────────── */
+
+.card-hidden {
+  opacity: 0;
+}
+
+/* a card rises into place the first time it comes into view */
+.card-rise {
+  animation: card-rise 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes card-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* the root is pressed onto the page like a ledger seal */
+.card-stamp {
+  animation: card-stamp 900ms cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both;
+}
+
+@keyframes card-stamp {
+  from {
+    opacity: 0;
+    transform: scale(1.35);
+    filter: blur(3px);
+  }
+  55% {
+    opacity: 1;
+    transform: scale(0.97);
+    filter: none;
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* parent→child lines draw downward; pathLength=1 on the path.
+   edge-trace: a selected bloodline drawing itself in */
+.edge-hidden {
+  opacity: 0;
+}
+
+.edge-draw,
+.edge-trace {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: edge-draw 480ms ease-out both;
+}
+
+/* glows haldi while drawing, then settles to its normal (or lineage) stroke */
+@keyframes edge-draw {
+  from {
+    stroke: var(--color-haldi);
+    stroke-width: 2.5;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-rise,
+  .card-stamp,
+  .edge-draw,
+  .edge-trace {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}

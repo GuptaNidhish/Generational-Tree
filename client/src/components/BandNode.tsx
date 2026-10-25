@@ -1,16 +1,14 @@
 import type { Node, NodeProps } from '@xyflow/react'
 import { memo } from 'react'
-import { generationColor } from '../lib/palette'
 
-export type BandNodeData = { generation: number; count: number; width: number; height: number }
+export type BandNodeData = { generation: number; width: number; height: number }
 export type BandNodeType = Node<BandNodeData, 'band'>
 
 export const BAND_GUTTER = 150
 
-// One ruled ledger row per generation, labelled in the left gutter
+// One ruled ledger row per generation (labels live in GenerationRail)
 function BandNodeComponent({ data }: NodeProps<BandNodeType>) {
-  const { generation, count, width, height } = data
-  const color = generationColor(generation)
+  const { generation, width, height } = data
   return (
     <div
       style={{ width, height }}
@@ -20,14 +18,6 @@ function BandNodeComponent({ data }: NodeProps<BandNodeType>) {
         className="absolute top-0 bottom-0 border-r border-bahi/25"
         style={{ width: BAND_GUTTER }}
       />
-      <div className="absolute top-1/2 left-5 -translate-y-1/2">
-        <div className="text-lg font-semibold leading-tight" style={{ color }}>
-          Generation {generation}
-        </div>
-        <div className="text-sm text-ink-soft">
-          {count} {count === 1 ? 'person' : 'people'}
-        </div>
-      </div>
     </div>
   )
 }

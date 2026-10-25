@@ -7,11 +7,10 @@ import { TopBar } from './components/TopBar'
 import { TreeActions } from './components/treeActions'
 import { indexFamily, lineageOf } from './lib/family'
 import { layoutTree, NODE_HEIGHT, NODE_WIDTH } from './lib/layout'
+import { motionMs } from './lib/motion'
 import type { TreeData } from './types'
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: TreeData }
-
-const motionMs = (ms: number) => (window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : ms)
 
 function TreeView({ data }: { data: TreeData }) {
   const { setCenter, getZoom, fitView } = useReactFlow()
@@ -21,6 +20,7 @@ function TreeView({ data }: { data: TreeData }) {
 
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedGenerations, setSelectedGenerations] = useState<Set<number>>(new Set())
+  const [explored, setExplored] = useState(false)
   const lineage = useMemo(() => (selectedId === null ? null : lineageOf(family, selectedId)), [family, selectedId])
 
   // Select a person and bring their card to the middle of the screen
@@ -51,6 +51,7 @@ function TreeView({ data }: { data: TreeData }) {
   )
 
   const clearSelection = useCallback(() => setSelectedId(null), [])
+  const markExplored = useCallback(() => setExplored(true), [])
   const actions = useMemo(() => ({ select: focusPerson }), [focusPerson])
 
   return (
@@ -70,12 +71,16 @@ function TreeView({ data }: { data: TreeData }) {
             selectedId={selectedId}
             selectedGenerations={selectedGenerations}
             onPaneClick={clearSelection}
+            onExplore={markExplored}
           />
-          {selectedId === null && (
-            <p className="pointer-events-none absolute bottom-4 left-1/2 hidden -translate-x-1/2 rounded-full bg-ink/85 px-4 py-1.5 text-sm text-kora sm:block">
-              Zoom in to read names, or search above. Select anyone to trace their bloodline.
-            </p>
-          )}
+          <p
+            aria-hidden={explored}
+            className={`pointer-events-none absolute bottom-4 left-1/2 z-[6] hidden -translate-x-1/2 rounded-full bg-ink/85 px-4 py-1.5 text-sm text-kora transition-opacity duration-700 motion-reduce:transition-none sm:block ${
+              explored || selectedId !== null ? 'opacity-0' : 'opacity-100'
+            }`}
+          >
+            Scroll to explore. Pinch or Ctrl + scroll to zoom.
+          </p>
           <DetailsDrawer
             person={selectedId === null ? null : (family.byId.get(selectedId) ?? null)}
             family={family}
@@ -91,10 +96,15 @@ function TreeView({ data }: { data: TreeData }) {
 export default function App() {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
 
+  // returns a cancel function so a superseded request (e.g. StrictMode's remount) can't update the screen
   const load = useCallback(() => {
+    let active = true
     fetchTree()
-      .then((data) => setState({ status: 'ready', data }))
-      .catch((e: Error) => setState({ status: 'error', message: e.message }))
+      .then((data) => active && setState({ status: 'ready', data }))
+      .catch((e: Error) => active && setState({ status: 'error', message: e.message }))
+    return () => {
+      active = false
+    }
   }, [])
 
   const retry = () => {

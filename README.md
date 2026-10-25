@@ -35,6 +35,16 @@ npm run build        # builds client/dist
 npm start            # serves the UI and /api from http://localhost:4000
 ```
 
+## Exploring the tree
+
+The tree opens on Sh. Deviram Gupta and is revealed as you explore:
+
+- **Scroll** (wheel or trackpad) to glide the camera down, up, left and right. Shift + wheel moves sideways. **Pinch** or **Ctrl/⌘ + scroll** zooms. Dragging pans.
+- Each card rises into place the first time it comes into view, and the line from its parent draws itself in. Zooming out to the overview (the ⛶ control) reveals the rest in one cascade.
+- **Select anyone** to trace their bloodline: the haldi line draws generation by generation, and the drawer lists parents, children and line of descent.
+- The left rail always shows which generations are on screen.
+- With *reduced motion* enabled in the OS, everything is shown at once and scrolling pans without easing.
+
 ## API
 
 | Endpoint | Returns |

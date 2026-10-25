@@ -8,7 +8,8 @@ export const RANK_GAP = 88
 const SIBLING_GAP = 14
 
 export type NodeState = 'normal' | 'selected' | 'lineage' | 'dimmed'
-export type PersonNodeData = { person: Person; state?: NodeState }
+// reveal: 'hidden' until first seen, then the animation delay in ms; absent = shown, no animation
+export type PersonNodeData = { person: Person; state?: NodeState; reveal?: 'hidden' | number }
 export type PersonNode = Node<PersonNodeData, 'person'>
 
 // Every generation sits on its own row, so y comes from the generation number

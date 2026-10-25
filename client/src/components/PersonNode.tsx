@@ -13,31 +13,35 @@ const STATE_CLASSES = {
 }
 
 function PersonNodeComponent({ data }: NodeProps<PersonNodeType>) {
-  const { person, state = 'normal' } = data
+  const { person, state = 'normal', reveal } = data
+  const revealClass = reveal === 'hidden' ? 'card-hidden' : reveal === undefined ? '' : person.generationNumber === 1 ? 'card-stamp' : 'card-rise'
   const { select } = useTreeActions()
   const color = generationColor(person.generationNumber)
 
   return (
     <>
       <Handle type="target" position={Position.Top} isConnectable={false} />
-      <button
-        type="button"
-        onClick={() => select(person.id)}
-        aria-pressed={state === 'selected'}
-        style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
-        className={`flex cursor-pointer items-stretch overflow-hidden rounded-md border text-left transition-[opacity,background-color] duration-200 motion-reduce:transition-none ${STATE_CLASSES[state]}`}
-      >
-        <span aria-hidden className="w-1.5 shrink-0" style={{ backgroundColor: color }} />
-        <span className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5">
-          <span className="line-clamp-3 text-[14px] leading-[1.15] font-semibold text-ink">{person.displayName}</span>
-          <span className="mt-1 flex items-center gap-1.5 text-xs text-ink-soft">
-            <span style={{ color }} className="font-semibold">
-              Gen {person.generationNumber}
+      <div className={revealClass} style={typeof reveal === 'number' ? { animationDelay: `${reveal}ms` } : undefined}>
+        <button
+          type="button"
+          tabIndex={reveal === 'hidden' ? -1 : undefined}
+          onClick={() => select(person.id)}
+          aria-pressed={state === 'selected'}
+          style={{ width: NODE_WIDTH, height: NODE_HEIGHT }}
+          className={`flex cursor-pointer items-stretch overflow-hidden rounded-md border text-left transition-[opacity,background-color] duration-200 motion-reduce:transition-none ${STATE_CLASSES[state]}`}
+        >
+          <span aria-hidden className="w-1.5 shrink-0" style={{ backgroundColor: color }} />
+          <span className="flex min-w-0 flex-1 flex-col justify-center px-2.5 py-1.5">
+            <span className="line-clamp-3 text-[14px] leading-[1.15] font-semibold text-ink">{person.displayName}</span>
+            <span className="mt-1 flex items-center gap-1.5 text-xs text-ink-soft">
+              <span style={{ color }} className="font-semibold">
+                Gen {person.generationNumber}
+              </span>
+              <GenderMark gender={person.gender} className="text-[13px] leading-none" />
             </span>
-            <GenderMark gender={person.gender} className="text-[13px] leading-none" />
           </span>
-        </span>
-      </button>
+        </button>
+      </div>
       <Handle type="source" position={Position.Bottom} isConnectable={false} />
     </>
   )
