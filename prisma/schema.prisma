@@ -1,0 +1,51 @@
+// Prisma Schema for Generational Tree
+// Database: Supabase (PostgreSQL)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// Table 1: Person
+// ─────────────────────────────────────────────
+model Person {
+  id               Int      @id @default(autoincrement())
+  salutation       String?  // e.g. "Shri", "Smt", "Late Shri"
+  firstName        String   @map("first_name")
+  middleName       String?  @map("middle_name")
+  surname          String   @map("surname")
+  displayName      String   @map("display_name")
+  gender           String   // "Male" or "Female"
+  generationNumber Int      @map("generation_number")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  parentOf         ParentChild[] @relation("ParentRelation")
+  childOf          ParentChild[] @relation("ChildRelation")
+
+  @@map("person")
+}
+
+// ─────────────────────────────────────────────
+// Table 2: ParentChild (join table)
+// ─────────────────────────────────────────────
+model ParentChild {
+  id       Int @id @default(autoincrement())
+  parentId Int @map("parent_id")
+  childId  Int @map("child_id")
+
+  // Foreign keys
+  parent   Person @relation("ParentRelation", fields: [parentId], references: [id], onDelete: Cascade)
+  child    Person @relation("ChildRelation", fields: [childId], references: [id], onDelete: Cascade)
+
+  // Prevent duplicate parent-child pairs
+  @@unique([parentId, childId])
+  @@map("parent_child")
+}

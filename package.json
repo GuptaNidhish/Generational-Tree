@@ -1,0 +1,42 @@
+{
+    "name": "generational-tree",
+    "version": "1.0.0",
+    "description": "Family Lineage",
+    "keywords": [
+        "Nodejs",
+        "React",
+        "Prisma",
+        "Postgres"
+    ],
+    "license": "ISC",
+    "author": "Nidhish Gupta",
+    "type": "commonjs",
+    "main": "index.js",
+    "scripts": {
+        "test": "node --test \"prisma/**/*.test.js\" \"server/**/*.test.js\"",
+        "dev": "nodemon --watch index.js --watch server index.js",
+        "start": "node index.js",
+        "client:dev": "npm --prefix client run dev",
+        "build": "npm --prefix client install && npm --prefix client run build",
+        "db:push": "prisma db push && npm run db:rls",
+        "db:rls": "prisma db execute --file prisma/enable-rls.sql --schema prisma/schema.prisma",
+        "db:seed": "prisma db seed",
+        "db:append": "node prisma/append-csv.js",
+        "add:member": "node prisma/add-member.js",
+        "db:studio": "prisma studio",
+        "db:reset": "prisma db push --force-reset && npm run db:rls && prisma db seed"
+    },
+    "prisma": {
+        "seed": "node prisma/seed.js"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.4.1",
+        "cors": "^2.8.6",
+        "csv-parse": "^7.0.3",
+        "express": "^5.3.0",
+        "nodemon": "^3.1.14"
+    },
+    "devDependencies": {
+        "prisma": "^6.4.1"
+    }
+}
