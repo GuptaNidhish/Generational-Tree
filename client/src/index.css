@@ -1,0 +1,78 @@
+@import '@fontsource/mukta/400.css';
+@import '@fontsource/mukta/500.css';
+@import '@fontsource/mukta/600.css';
+@import '@fontsource/mukta/700.css';
+@import '@fontsource/rozha-one/400.css';
+@import '@xyflow/react/dist/style.css';
+@import 'tailwindcss';
+
+/* Bahi-khata ledger palette */
+@theme {
+  --color-bahi: #9b1c22;
+  --color-bahi-deep: #74141a;
+  --color-kora: #f2f3ee;
+  --color-paper: #fbfbf8;
+  --color-ink: #1f2347;
+  --color-ink-soft: #565a78;
+  --color-haldi: #e0a526;
+  --color-haldi-deep: #b8800c;
+  --color-haldi-wash: #fbf0d4;
+  --font-sans: 'Mukta', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Rozha One', Georgia, serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-kora);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-haldi);
+  outline-offset: 2px;
+}
+
+/* React Flow chrome in the ledger palette */
+.react-flow {
+  --xy-background-color: var(--color-kora);
+  --xy-edge-stroke: rgb(31 35 71 / 0.28);
+  --xy-edge-stroke-width: 1.5;
+  --xy-controls-button-background-color: var(--color-paper);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-border-color: rgb(31 35 71 / 0.12);
+  --xy-minimap-background-color: var(--color-paper);
+  --xy-minimap-mask-background-color: rgb(242 243 238 / 0.7);
+  --xy-attribution-background-color: transparent;
+}
+
+.react-flow__node-band {
+  pointer-events: none;
+}
+
+/* Nodes are neither draggable nor selectable, so React Flow disables their
+   pointer events; person cards hold a button and must stay clickable */
+.react-flow__node-person {
+  pointer-events: all !important;
+}
+
+.react-flow__handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.react-flow__edge.lineage path {
+  stroke: var(--color-haldi-deep);
+  stroke-width: 2.5;
+}
+
+.react-flow__edge.dimmed {
+  opacity: 0.2;
+}

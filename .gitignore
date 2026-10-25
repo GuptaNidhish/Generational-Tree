@@ -7,3 +7,4 @@ client/node_modules/
 *.log
 IMG_*.JPG
 *.numbers
+.playwright-mcp/

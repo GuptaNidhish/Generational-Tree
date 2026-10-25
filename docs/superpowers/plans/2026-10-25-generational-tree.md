@@ -4,9 +4,9 @@
 
 **Goal:** Seed the Gupta family lineage (127 people, 126 parent→child links, 7 generations) into Supabase via Prisma, expose it through an Express API, and render it as an interactive top-to-bottom React Flow tree.
 
-**Architecture:** Prisma 6 talks to Supabase through the IPv4 poolers: the transaction pooler (6543, `pgbouncer=true`) handles runtime queries and the session pooler (5432) handles `db push`. An Express 5 app (`server/app.js`, built by a `createApp({ prisma })` factory so tests can inject a fake client) serves `/api/*`, plus `client/dist` in production. A Vite + React + TS client in `client/` fetches `/api/tree` once and does layout (dagre, TB), search, and generation filtering in the browser, since 127 nodes is small.
+**Architecture:** Prisma 6 talks to Supabase through the IPv4 poolers: the transaction pooler (6543, `pgbouncer=true`) handles runtime queries and the session pooler (5432) handles `db push`. An Express 5 app (`server/app.js`, built by a `createApp({ prisma })` factory so tests can inject a fake client) serves `/api/*`, plus `client/dist` in production. A Vite + React + TS client in `client/` fetches `/api/tree` once and does layout (tidy tree, TB), search, and generation filtering in the browser, since 127 nodes is small.
 
-**Tech Stack:** Node 26, Express 5, Prisma 6.4 / `@prisma/client`, `csv-parse`, Supabase Postgres, Vite, React 19, TypeScript, `@xyflow/react`, `@dagrejs/dagre`, Tailwind CSS v4 (`@tailwindcss/vite`), Vitest, `node:test`.
+**Tech Stack:** Node 26, Express 5, Prisma 6.4 / `@prisma/client`, `csv-parse`, Supabase Postgres, Vite, React 19, TypeScript, `@xyflow/react`, `d3-hierarchy` (tidy tree; replaced dagre, see Task 4), Tailwind CSS v4 (`@tailwindcss/vite`), Vitest, `node:test`.
 
 **Spec:** `context.md` (+ Supabase Prisma connection instructions supplied by the user)
 
@@ -44,10 +44,10 @@
 - Modify: `package.json` (add `csv-parse` dependency)
 - Create: whatever `npx skills add supabase/agent-skills` writes (commit it)
 
-- [ ] **Step 1:** Rewrite `.env` with the two Global Constraints URLs, using the password already in `.env`.
-- [ ] **Step 2:** `npm install csv-parse`. (`prisma` is already installed. `npx prisma init` is skipped because `prisma/schema.prisma` and `.env` already exist and `init` would refuse or overwrite.)
-- [ ] **Step 3:** `npx skills add supabase/agent-skills` (non-interactive flags if offered).
-- [ ] **Step 4:** Verify the connection: `npx prisma db push`. Expected: "Your database is now in sync with your Prisma schema" and the client generated.
+- [x] **Step 1:** Rewrite `.env` with the two Global Constraints URLs, using the password already in `.env`.
+- [x] **Step 2:** `npm install csv-parse`. (`prisma` is already installed. `npx prisma init` is skipped because `prisma/schema.prisma` and `.env` already exist and `init` would refuse or overwrite.)
+- [x] **Step 3:** `npx skills add supabase/agent-skills` (non-interactive flags if offered).
+- [x] **Step 4:** Verify the connection: `npx prisma db push`. Expected: "Your database is now in sync with your Prisma schema" and the client generated.
 
 ### Task 2: Seed script with tested CSV mapping
 
@@ -59,17 +59,17 @@
 **Interfaces:**
 - Produces: `parsePersons(rows: object[]) -> PersonCreateInput[]` (includes `id`) and `parseLinks(rows: object[]) -> {parentId:number, childId:number}[]`, both from `prisma/seed-lib.js` (CommonJS).
 
-- [ ] **Step 1: Write failing tests** in `prisma/seed-lib.test.js`:
+- [x] **Step 1: Write failing tests** in `prisma/seed-lib.test.js`:
   - `parsePersons maps CSV headers to schema fields`: row `{Id:"4",Salutation:"Sh",First_Name:"Bhagat",Middle_Name:"Ram",Last_Name:"Gupta",Display_Name:"Sh. Bhagat Ram Gupta",Gender:"Male",Generation_Number:"3"}` → `{id:4,salutation:"Sh",firstName:"Bhagat",middleName:"Ram",surname:"Gupta",displayName:"Sh. Bhagat Ram Gupta",gender:"Male",generationNumber:3}`
   - `parsePersons maps empty optional fields to null`: `Salutation:""`, `Middle_Name:""` → `salutation:null, middleName:null`. Empty `Display_Name` falls back to the non-empty parts joined by single spaces.
   - `parseLinks uses Person_Id as parent and drops NULL children`: rows `[{Person_Id:"1",child_id:"2"},{Person_Id:"2",child_id:"NULL"},{Person_Id:"3",child_id:""}]` → `[{parentId:1,childId:2}]`
   - `real CSVs yield 127 persons and 126 links`: reads `prisma/seed-data/*.csv` with the same `readCSV` options; asserts lengths and that every `childId` has exactly one parent.
-- [ ] **Step 2:** `node --test prisma/` → FAIL (module not found).
-- [ ] **Step 3:** Implement `prisma/seed-lib.js`, also exporting `readCSV(filename)` (moved out of `seed.js`).
-- [ ] **Step 4:** `node --test prisma/` → PASS.
-- [ ] **Step 5:** Rewrite `prisma/seed.js`: `deleteMany` links then persons, `person.createMany(parsePersons)`, `parentChild.createMany(parseLinks)`, then reset both sequences with `SELECT setval(pg_get_serial_sequence('<table>','id'), (SELECT MAX(id) FROM <table>))`. Then print counts and throw if they are not 127/126.
-- [ ] **Step 6:** `npm run db:seed` twice. Both runs print 127 persons and 126 links.
-- [ ] **Step 7:** Commit and push: `feat(db): configure supabase poolers and fix seed data import`.
+- [x] **Step 2:** `node --test prisma/` → FAIL (module not found).
+- [x] **Step 3:** Implement `prisma/seed-lib.js`, also exporting `readCSV(filename)` (moved out of `seed.js`).
+- [x] **Step 4:** `node --test prisma/` → PASS.
+- [x] **Step 5:** Rewrite `prisma/seed.js`: `deleteMany` links then persons, `person.createMany(parsePersons)`, `parentChild.createMany(parseLinks)`, then reset both sequences with `SELECT setval(pg_get_serial_sequence('<table>','id'), (SELECT MAX(id) FROM <table>))`. Then print counts and throw if they are not 127/126.
+- [x] **Step 6:** `npm run db:seed` twice. Both runs print 127 persons and 126 links.
+- [x] **Step 7:** Commit and push: `feat(db): configure supabase poolers and fix seed data import`.
 
 ## Phase 2: Express API
 
@@ -89,11 +89,11 @@
   - `GET /api/persons/:id` → `Person & {parents: Person[], children: Person[]}`. 404 `{error:"Person not found"}`, 400 for a non-integer id.
   - Any thrown error → `500 {error:"Internal server error"}`
 
-- [ ] **Step 1: Write failing tests:** `GET /api/tree returns persons and relationships`, `GET /api/persons filters by search and generation` (asserts the `where` passed to the fake `findMany`), `GET /api/persons/:id returns 404 for unknown id`, `GET /api/persons/abc returns 400`, `GET /api/tree returns 500 JSON when prisma throws`.
-- [ ] **Step 2:** `npm test` → FAIL.
-- [ ] **Step 3:** Implement `server/app.js` (cors, express.json, routes, error middleware) and `index.js`.
-- [ ] **Step 4:** `npm test` → PASS. Then `npm start` and `curl localhost:4000/api/tree | jq '.persons|length, (.relationships|length)'` → `127`, `126`.
-- [ ] **Step 5:** Commit and push: `feat(api): add express tree and person endpoints`.
+- [x] **Step 1: Write failing tests:** `GET /api/tree returns persons and relationships`, `GET /api/persons filters by search and generation` (asserts the `where` passed to the fake `findMany`), `GET /api/persons/:id returns 404 for unknown id`, `GET /api/persons/abc returns 400`, `GET /api/tree returns 500 JSON when prisma throws`.
+- [x] **Step 2:** `npm test` → FAIL.
+- [x] **Step 3:** Implement `server/app.js` (cors, express.json, routes, error middleware) and `index.js`.
+- [x] **Step 4:** `npm test` → PASS. Then `npm start` and `curl localhost:4000/api/tree | jq '.persons|length, (.relationships|length)'` → `127`, `126`.
+- [x] **Step 5:** Commit and push: `feat(api): add express tree and person endpoints`.
 
 ## Phase 3: Frontend
 
@@ -104,15 +104,17 @@
 - Modify: `client/vite.config.ts` (tailwind plugin, `server.proxy['/api'] = 'http://localhost:4000'`)
 - Create: `client/src/types.ts`: `Person`, `Relationship`, `TreeData` (matching the Task 3 shapes)
 - Create: `client/src/lib/family.ts`: `indexFamily(data: TreeData) -> FamilyIndex {byId: Map<number,Person>, parentsOf: Map<number,Person[]>, childrenOf: Map<number,Person[]>}`, `searchPersons(persons: Person[], query: string, limit = 8) -> Person[]`
-- Create: `client/src/lib/layout.ts`: `layoutTree(data: TreeData) -> {nodes: Node<PersonNodeData>[], edges: Edge[]}`. dagre `rankdir:'TB'`, `nodesep:24`, `ranksep:90`, node size `NODE_WIDTH=180 × NODE_HEIGHT=72`, edge type `smoothstep`, node type `'person'`.
+- Create: `client/src/lib/layout.ts`: `layoutTree(data: TreeData) -> {nodes: Node<PersonNodeData>[], edges: Edge[]}`. `d3-hierarchy` `tree()` (Reingold–Tilford), each person under their first parent, a virtual super-root for multiple roots, y fixed per generation by `rankY(gen)`, node size `NODE_WIDTH=140 × NODE_HEIGHT=84`, edge type `smoothstep`, node type `'person'`.
+  - *Revision:* dagre was tried first. On the real data it left parents at the edge of their subtrees and produced an unreadable 9:1 canvas. The data is a strict tree (one parent per child), so a tidy tree centers parents and packs subtrees by contour.
 - Create: `client/src/lib/palette.ts`: `generationColor(gen: number) -> {bg, border, text, accent}` for gens 1–7
 - Test: `client/src/lib/family.test.ts`, `client/src/lib/layout.test.ts`
 
-- [ ] **Step 1: Write failing tests:**
+- [x] **Step 1: Write failing tests:**
   - `indexFamily handles root and leaves`: root has `parentsOf.get(1) ?? []` empty, a leaf has an empty children list, a mid node has both.
   - `searchPersons is case-insensitive and partial`: `"ram"` matches "Sh. Bhagat Ram Gupta". `"zzz"` → `[]`. `""` → `[]`.
   - `layoutTree places each generation strictly below its parent`: every edge has `target.position.y > source.position.y`. Node count equals person count, edge count equals relationship count.
-- [ ] **Step 2:** `npm --prefix client test` → FAIL. **Step 3:** implement. **Step 4:** → PASS.
+  - `layoutTree centers a parent over its children`, `layoutTree does not overlap cards in a row`, `layoutTree places people with several roots or a second parent`.
+- [x] **Step 2:** `npm --prefix client test` → FAIL. **Step 3:** implement. **Step 4:** → PASS.
 
 ### Task 5: Tree UI
 
@@ -126,10 +128,10 @@
 - Create: `client/src/components/FamilyTree.tsx`: `ReactFlow` with `MiniMap`, `Controls`, `Background`. Uses `setCenter` on search select. `nodesDraggable={false}`, `onlyRenderVisibleElements`.
 - Modify: `client/src/App.tsx`, `client/src/index.css`: loading, error + retry, and the main layout
 
-- [ ] **Step 1:** Build the components (use the frontend-design skill for visual direction).
-- [ ] **Step 2:** `npm --prefix client run build` passes type-check. `npm --prefix client test` passes.
-- [ ] **Step 3:** Run API + `vite`, then drive in the browser: tree renders 127 nodes top→bottom, search "bhagat" centers on him, clicking a node opens the drawer, the Gen 7 filter dims the others, and stopping the API shows the error state.
-- [ ] **Step 4:** Commit and push: `feat(client): interactive family tree with search, filter and details`.
+- [x] **Step 1:** Build the components (use the frontend-design skill for visual direction).
+- [x] **Step 2:** `npm --prefix client run build` passes type-check. `npm --prefix client test` passes.
+- [x] **Step 3:** Run API + `vite`, then drive in the browser: tree renders 127 nodes top→bottom, search "bhagat" centers on him, clicking a node opens the drawer, the Gen 7 filter dims the others, and stopping the API shows the error state.
+- [x] **Step 4:** Commit and push: `feat(client): interactive family tree with search, filter and details`.
 
 ## Phase 4: Polish
 
@@ -139,7 +141,7 @@
 - Modify: `index.js` (static serving verified), `client/src/*` (fixes found during testing)
 - Create: `README.md`: setup (`.env`, `db:push`, `db:seed`, `dev`, `client:dev`, `build`, `start`)
 
-- [ ] **Step 1:** `npm run build && npm start` → `localhost:4000` serves the UI and API from one process.
-- [ ] **Step 2:** Check at a 390px mobile and a 1440px desktop viewport (drawer becomes full-width on mobile, top bar wraps). Pan and zoom stay smooth.
-- [ ] **Step 3:** All tests pass (`npm test`, `npm --prefix client test`).
-- [ ] **Step 4:** Commit and push: `chore: production build, responsive polish and README`.
+- [x] **Step 1:** `npm run build && npm start` → `localhost:4000` serves the UI and API from one process.
+- [x] **Step 2:** Check at a 390px mobile and a 1440px desktop viewport (drawer becomes full-width on mobile, top bar wraps). Pan and zoom stay smooth.
+- [x] **Step 3:** All tests pass (`npm test`, `npm --prefix client test`).
+- [x] **Step 4:** Commit and push: `chore: production build, responsive polish and README`.
