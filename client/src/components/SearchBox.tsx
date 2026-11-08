@@ -1,14 +1,15 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { prefersReducedMotion } from '../lib/motion'
 import { searchPersons } from '../lib/family'
+import { toRoman } from '../lib/generations'
 import { generationColor } from '../lib/palette'
 import type { Person } from '../types'
 import gsap from 'gsap'
 
-type Props = { persons: Person[]; onSelect: (person: Person) => void }
+type Props = { persons: Person[]; onSelect: (person: Person) => void; describe?: (person: Person) => string | null }
 
 // Name search with keyboard-navigable suggestions and GSAP animations
-export function SearchBox({ persons, onSelect }: Props) {
+export function SearchBox({ persons, onSelect, describe }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -67,7 +68,7 @@ export function SearchBox({ persons, onSelect }: Props) {
   }
 
   return (
-    <div className="relative w-full sm:w-80">
+    <div className="relative w-full">
       <div className="relative flex items-center">
         {/* Search Icon */}
         <span className="pointer-events-none absolute left-3 text-ink-soft">
@@ -84,7 +85,7 @@ export function SearchBox({ persons, onSelect }: Props) {
           aria-expanded={showList}
           aria-controls={listId}
           aria-activedescendant={showList && results[active] ? `${listId}-${results[active].id}` : undefined}
-          placeholder="Find a family member…"
+          placeholder="Search by name"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -94,7 +95,7 @@ export function SearchBox({ persons, onSelect }: Props) {
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           onKeyDown={onKeyDown}
-          className="w-full rounded-lg border border-white/20 bg-kora pr-9 pl-9 py-2 text-[15px] font-medium text-ink shadow-inner placeholder:text-ink-soft/70 transition-all focus:bg-white focus:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-haldi"
+          className="h-10 w-full rounded-full border border-gold/45 bg-paper/90 pr-9 pl-9 text-[1rem] text-ink placeholder:text-ink-soft transition-[border-color,box-shadow] focus:border-gold focus:shadow-[0_0_0_3px_rgb(216_190_135_/_0.45)] focus:outline-none [&::-webkit-search-cancel-button]:hidden"
         />
 
         {/* Clear Button */}
@@ -121,11 +122,11 @@ export function SearchBox({ persons, onSelect }: Props) {
           ref={listRef}
           id={listId}
           role="listbox"
-          className="absolute top-full right-0 left-0 z-40 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-ink/15 bg-paper p-1.5 shadow-2xl backdrop-blur-md"
+          className="absolute top-full right-0 left-0 z-40 mt-2 max-h-80 overflow-y-auto rounded-xl border border-gold/40 bg-paper p-1.5 shadow-[0_18px_40px_-18px_rgb(74_14_26_/_0.55)]"
         >
           {results.length === 0 && (
-            <li className="px-4 py-3 text-center text-sm text-ink-soft">
-              No one found matching <span className="font-semibold text-ink">"{query}"</span>
+            <li className="px-4 py-3 text-center text-[0.9375rem] text-ink-soft">
+              No one named <span className="font-semibold text-ink">“{query}”</span>. Try part of a first name or surname.
             </li>
           )}
           {results.map((person, i) => (
@@ -139,26 +140,24 @@ export function SearchBox({ persons, onSelect }: Props) {
                 choose(person)
               }}
               onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-[14px] transition-colors ${
-                i === active ? 'bg-haldi-wash font-medium text-ink' : 'text-ink/85 hover:bg-black/5'
+              className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-[1rem] transition-colors ${
+                i === active ? 'bg-gold/15 text-ink' : 'text-ink'
               }`}
             >
-              <span className="flex items-center gap-2 truncate">
+              <span className="flex min-w-0 items-center gap-2">
                 <span
                   aria-hidden
                   className="size-2 shrink-0 rounded-full"
                   style={{ backgroundColor: generationColor(person.generationNumber) }}
                 />
-                <span className="truncate">{person.displayName}</span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate">{person.displayName}</span>
+                  {describe?.(person) && <span className="truncate text-[0.875rem] text-ink-soft">{describe(person)}</span>}
+                </span>
               </span>
-              <span
-                className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-semibold"
-                style={{
-                  color: generationColor(person.generationNumber),
-                  backgroundColor: `${generationColor(person.generationNumber)}15`,
-                }}
-              >
-                Gen {person.generationNumber}
+              <span className="shrink-0 font-display text-[0.875rem]" style={{ color: generationColor(person.generationNumber) }}>
+                <span className="sr-only">Generation </span>
+                {toRoman(person.generationNumber)}
               </span>
             </li>
           ))}

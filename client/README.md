@@ -1,32 +1,28 @@
-# React + TypeScript + Vite
+# Gupta Vanshavali — client
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Vite + React 19 + TypeScript + Tailwind CSS v4, animated with GSAP and ScrollTrigger. The page loads the whole family once from `GET /api/tree` and lays it out in the browser. No family data lives in the client.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm run dev     # http://localhost:5173, proxies /api to :4000
+npm test        # vitest: data grouping, tree geometry, search
+npm run build   # type-check and build to dist/
+npm run lint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## How the page is put together
+
+| Piece | Where |
+| --- | --- |
+| Data loading, selection and highlight state | `src/App.tsx` |
+| Generations split into sibling groups, ordered depth-first | `src/lib/generations.ts` |
+| Hero tree geometry (one branch per link, one leaf per person) | `src/lib/treeShape.ts`, `components/TreeSilhouette.tsx` |
+| One section per generation → family clusters → person cards | `components/GenerationSection.tsx`, `FamilyCluster.tsx`, `PersonCard.tsx`, `Patriarch.tsx` |
+| Parent → child branches, measured from the real layout | `components/BranchConnectors.tsx` |
+| Scroll behaviour: active generation, progress, reveals, parallax | `src/hooks/useScrollStory.ts` |
+| Profile panel (parent, siblings, children, line of descent) | `components/ProfilePanel.tsx` |
+
+Motion notes:
+
+- Every scroll animation is registered in `gsap.matchMedia()` under `prefers-reduced-motion: no-preference`. With reduced motion nothing is hidden or animated.
+- Card tilt and the 3D entrance are limited to fine pointers on screens at least 768px wide (`canTilt` in `src/lib/motion.ts`).
+- Only leaf elements (cards, headings, numerals) get transforms. Transforming a container would throw off ScrollTrigger's measurements of the families inside it.
