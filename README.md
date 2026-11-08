@@ -46,6 +46,36 @@ The site tells the family's story one generation at a time as you scroll down th
 - **The roman numerals** in the header (a dock at the bottom on phones and tablets) show which generation is on screen and jump to any generation. The gold line under the header shows how far down the family you are.
 - With *reduced motion* enabled in the OS, everything is shown at once and jumps happen without animation.
 
+## Admins and visitor comments
+
+**Visitors** don't need an account. On anyone's profile, *Know something we've missed?* lets them tell the family admins about a missing child or a mistake. They give their name and mobile number, say whether they (or an ancestor) are in the tree and which person that is, and pass Cloudflare Turnstile, a free "are you human" check. Comments and phone numbers are only visible to admins. There is no SMS code: admins call back to confirm when needed.
+
+**Admins** sign in at `/admin` (or *Sign in as admin* at the foot of the page). They can:
+- edit anyone's details and add children under anyone (a child is placed one generation below the parent; a child of generation VII starts generation VIII);
+- review visitor comments, call the visitor, and mark each comment resolved or dismissed with a note.
+
+Changes are saved to the database, so everyone sees them: the admin's page updates at once, and visitors' open pages refresh when they return to the tab.
+
+**The owner** is the one account that can add and remove other admins (*Manage admins*). Create it once:
+
+```bash
+npm run admin:owner                      # asks for a username and password
+npm run admin:owner -- --reset-password  # if you forget the owner password
+```
+
+The script refuses to make a second owner, and the database enforces this too. There is no way to create an admin except from the owner's *Manage admins* screen.
+
+Settings (see `.env.example` and `client/.env.example`):
+
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `SESSION_SECRET` | `.env` | Signs admin sign-in cookies. **Required in production.** In development, a temporary key is used if it's missing. |
+| `TURNSTILE_SECRET_KEY` | `.env` | Cloudflare Turnstile secret. Empty skips the check (development only). |
+| `VITE_TURNSTILE_SITE_KEY` | `client/.env` | Turnstile site key shown on the comment form. |
+| `TRUST_PROXY` | `.env` | Set to `1` behind a reverse proxy so rate limits see real visitor IPs. |
+
+Limits: 10 sign-in attempts per 15 minutes per IP; 5 comments per hour per IP and 5 per day per phone number.
+
 ## API
 
 | Endpoint | Returns |
@@ -54,6 +84,8 @@ The site tells the family's story one generation at a time as you scroll down th
 | `GET /api/persons?search=ram&generation=3` | Matching people (case-insensitive name search) |
 | `GET /api/persons/:id` | A person with their `parents` and `children` |
 | `GET /api/health` | `{ ok: true }` |
+| `POST /api/persons/:id/comments` | Visitor comment (name, phone, tree connection, message, Turnstile token) |
+| `/api/admin/*` | Sign-in, editing people, adding children, comment review, admin accounts (see `server/app.js`) |
 
 ## Tests
 

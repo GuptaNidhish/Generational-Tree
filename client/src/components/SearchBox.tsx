@@ -6,10 +6,17 @@ import { generationColor } from '../lib/palette'
 import type { Person } from '../types'
 import gsap from 'gsap'
 
-type Props = { persons: Person[]; onSelect: (person: Person) => void; describe?: (person: Person) => string | null }
+type Props = {
+  persons: Person[]
+  onSelect: (person: Person) => void
+  describe?: (person: Person) => string | null
+  label?: string
+  placeholder?: string
+  id?: string
+}
 
 // Name search with keyboard-navigable suggestions and GSAP animations
-export function SearchBox({ persons, onSelect, describe }: Props) {
+export function SearchBox({ persons, onSelect, describe, label = 'Find a family member', placeholder = 'Search by name', id }: Props) {
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
@@ -81,11 +88,12 @@ export function SearchBox({ persons, onSelect, describe }: Props) {
           ref={inputRef}
           type="search"
           role="combobox"
-          aria-label="Find a family member"
+          aria-label={label}
+          id={id}
           aria-expanded={showList}
           aria-controls={listId}
           aria-activedescendant={showList && results[active] ? `${listId}-${results[active].id}` : undefined}
-          placeholder="Search by name"
+          placeholder={placeholder}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value)

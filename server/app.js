@@ -172,10 +172,16 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
     res.json({ ok: true });
   });
 
+  // Who is signed in: the admin, or null for visitors (200 either way, so
+  // ordinary visitors don't see a failed request in their console)
+  admin.get("/me", async (req, res) => {
+    const adminId = auth.verifySession(auth.readCookie(req, auth.COOKIE_NAME), sessionSecret);
+    const me = adminId === null ? null : await prisma.admin.findUnique({ where: { id: adminId }, select: auth.ADMIN_SELECT });
+    res.json(me ? { username: me.username, role: me.role } : null);
+  });
+
   // Everything below needs a signed-in admin
   admin.use(auth.requireAdmin({ prisma, secret: sessionSecret }));
-
-  admin.get("/me", (req, res) => res.json({ username: req.admin.username, role: req.admin.role }));
 
   admin.post("/me/password", async (req, res) => {
     const { currentPassword, newPassword } = req.body ?? {};

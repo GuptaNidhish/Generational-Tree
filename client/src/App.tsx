@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchTree } from './api'
+import { fetchTree, listComments } from './api'
+import { AdminBar } from './components/AdminBar'
+import { AdminLogin } from './components/AdminLogin'
 import { BackToTop } from './components/BackToTop'
+import { ChangePassword } from './components/ChangePassword'
+import { CommentsReview } from './components/CommentsReview'
 import { GenerationNav } from './components/GenerationNav'
 import { GenerationSection } from './components/GenerationSection'
 import { Hero } from './components/Hero'
+import { ManageAdmins } from './components/ManageAdmins'
 import type { CardState } from './components/PersonCard'
 import { ProfilePanel } from './components/ProfilePanel'
 import { SiteHeader } from './components/SiteHeader'
 import { StoryActionsContext, type StoryActions } from './components/storyActions'
+import { useAdmin } from './hooks/useAdmin'
 import { useScrollStory } from './hooks/useScrollStory'
 import { revealNow } from './lib/animations'
 import { indexFamily } from './lib/family'
 import { buildGenerations, childWord, siblingsOf } from './lib/generations'
 import { scrollBehavior } from './lib/motion'
-import type { Person, TreeData } from './types'
+import type { Person, TreeData, VisitorComment } from './types'
 
 type LoadState = { status: 'loading' } | { status: 'error'; message: string } | { status: 'ready'; data: TreeData }
 
@@ -25,7 +31,10 @@ function scrollToElement(el: Element | null, block: ScrollLogicalPosition = 'cen
   el.scrollIntoView({ behavior: scrollBehavior(), block })
 }
 
-function FamilyStory({ data }: { data: TreeData }) {
+type AdminDialog = 'login' | 'password' | 'admins' | 'comments' | null
+const isAdminPath = () => window.location.pathname.replace(/\/+$/, '') === '/admin'
+
+function FamilyStory({ data, reload }: { data: TreeData; reload: (force?: boolean) => Promise<void> }) {
   const family = useMemo(() => indexFamily(data), [data])
   const generations = useMemo(() => buildGenerations(data, family), [data, family])
   const generationNumbers = useMemo(() => generations.map((g) => g.number), [generations])
@@ -39,7 +48,42 @@ function FamilyStory({ data }: { data: TreeData }) {
 
   const rootRef = useRef<HTMLDivElement>(null)
   const progressRef = useRef<HTMLDivElement>(null)
-  useScrollStory({ rootRef, progressRef, onActiveGeneration: setActive, onPastHero: setPastHero })
+  // the tree's data is the version: when an admin changes it, scroll triggers are rebuilt
+  useScrollStory({ rootRef, progressRef, onActiveGeneration: setActive, onPastHero: setPastHero, dataVersion: data })
+
+  // ── Admin ──
+  const { admin, checked, setAdmin, signOut } = useAdmin()
+  // /admin opens the sign-in dialog (shown once we know nobody is signed in)
+  const [dialog, setDialog] = useState<AdminDialog>(() => (isAdminPath() ? 'login' : null))
+  const [fetchedComments, setFetchedComments] = useState<VisitorComment[]>([])
+  const newComments = useMemo(() => (admin ? fetchedComments : []), [admin, fetchedComments])
+  // after adding someone, scroll to them once the refreshed tree has rendered
+  const pendingFocus = useRef<number | null>(null)
+
+  // already signed in: tidy the /admin address away
+  useEffect(() => {
+    if (admin && isAdminPath()) window.history.replaceState(null, '', '/')
+  }, [admin])
+
+  const refreshComments = useCallback(() => {
+    if (admin) listComments('new').then(setFetchedComments, () => {})
+  }, [admin])
+  useEffect(refreshComments, [refreshComments])
+
+  // Coming back to the tab: pick up changes other admins (or visitors) made
+  useEffect(() => {
+    const onFocus = () => {
+      if (document.visibilityState !== 'visible') return
+      reload()
+      refreshComments()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [reload, refreshComments])
 
   // The selected person's immediate family: parent, siblings and children
   const relatives = useMemo(() => {
@@ -112,6 +156,29 @@ function FamilyStory({ data }: { data: TreeData }) {
 
   const selected = selectedId === null ? null : (family.byId.get(selectedId) ?? null)
 
+  const closeDialog = useCallback(() => {
+    setDialog(null)
+    if (isAdminPath()) window.history.replaceState(null, '', '/')
+  }, [])
+
+  // An admin saved a change: refresh the tree for everyone on this page
+  const onSaved = useCallback(
+    async (person: Person, kind: 'edited' | 'child') => {
+      if (kind === 'child') pendingFocus.current = person.id
+      await reload(true)
+    },
+    [reload]
+  )
+
+  useEffect(() => {
+    const id = pendingFocus.current
+    if (id === null || !family.byId.has(id)) return
+    pendingFocus.current = null
+    goToPerson(id)
+  }, [family, goToPerson])
+
+  const commentsAboutProfile = useMemo(() => newComments.filter((c) => c.personId === profileId), [newComments, profileId])
+
   return (
     <StoryActionsContext.Provider value={actions}>
       <a href="#generation-1" className="sr-only z-50 rounded bg-wine px-3 py-2 text-paper focus:not-sr-only focus:fixed focus:top-3 focus:left-3">
@@ -147,7 +214,7 @@ function FamilyStory({ data }: { data: TreeData }) {
           ))}
         </main>
 
-        <footer className="border-t border-gold/35 px-6 py-14 text-center">
+        <footer className="border-t border-gold/35 px-6 pt-14 pb-28 text-center lg:pb-14">
           <p className="font-display text-[1.5rem] text-wine">Gupta Vanshavali</p>
           <p className="mt-1 text-ink-soft">
             {data.persons.length} members across {generations.length} generations
@@ -156,6 +223,14 @@ function FamilyStory({ data }: { data: TreeData }) {
           <button type="button" onClick={toTop} className="mt-5 cursor-pointer text-[0.9375rem] font-medium text-gold-ink underline decoration-gold/60 underline-offset-4 hover:text-wine">
             Return to the top
           </button>
+          {!admin && (
+            <p className="mt-8 text-[0.875rem] text-ink-soft">
+              Look after this tree?{' '}
+              <button type="button" onClick={() => setDialog('login')} className="cursor-pointer font-medium text-gold-ink underline decoration-gold/60 underline-offset-4 hover:text-wine">
+                Sign in as admin
+              </button>
+            </p>
+          )}
         </footer>
       </div>
 
@@ -189,9 +264,47 @@ function FamilyStory({ data }: { data: TreeData }) {
 
       <BackToTop visible={pastHero} onClick={toTop} />
 
+      {admin && (
+        <AdminBar
+          admin={admin}
+          newComments={newComments.length}
+          onComments={() => setDialog('comments')}
+          onManageAdmins={() => setDialog('admins')}
+          onChangePassword={() => setDialog('password')}
+          onSignOut={signOut}
+        />
+      )}
+      {dialog === 'login' && checked && !admin && (
+        <AdminLogin
+          onClose={closeDialog}
+          onSignedIn={(me) => {
+            setAdmin(me)
+            closeDialog()
+          }}
+        />
+      )}
+      {dialog === 'password' && admin && <ChangePassword onClose={closeDialog} />}
+      {dialog === 'admins' && admin?.role === 'owner' && <ManageAdmins onClose={closeDialog} />}
+      {dialog === 'comments' && admin && (
+        <CommentsReview
+          onClose={closeDialog}
+          onChanged={refreshComments}
+          onJump={(id) => {
+            actions.open(id)
+            goToPerson(id)
+          }}
+        />
+      )}
+
       <ProfilePanel
         person={profileId === null ? null : (family.byId.get(profileId) ?? null)}
         family={family}
+        persons={data.persons}
+        describe={describe}
+        admin={admin}
+        comments={commentsAboutProfile}
+        onSaved={onSaved}
+        onCommentsChanged={refreshComments}
         onSelect={(id) => {
           actions.open(id)
           goToPerson(id)
@@ -232,7 +345,33 @@ export default function App() {
 
   useEffect(() => load(), [load])
 
-  if (state.status === 'ready') return <FamilyStory data={state.data} />
+  // Fetch the tree again without the loading screen (after an admin's change,
+  // or when the tab regains focus). Keeps the same object when nothing changed,
+  // so the page doesn't redo its layout for nothing.
+  const lastJson = useRef('')
+  const lastFetch = useRef(0)
+  const reload = useCallback(async (force = false) => {
+    // focus events come in pairs and often; an admin's save always goes through
+    if (!force && Date.now() - lastFetch.current < 15_000) return
+    lastFetch.current = Date.now()
+    try {
+      const data = await fetchTree()
+      const json = JSON.stringify(data)
+      if (json === lastJson.current) return
+      lastJson.current = json
+      setState({ status: 'ready', data })
+    } catch {
+      // keep showing what we have; the next focus will try again
+    }
+  }, [])
+  useEffect(() => {
+    if (state.status === 'ready' && !lastJson.current) {
+      lastJson.current = JSON.stringify(state.data)
+      lastFetch.current = Date.now()
+    }
+  }, [state])
+
+  if (state.status === 'ready') return <FamilyStory data={state.data} reload={reload} />
 
   return (
     <div className="flex min-h-svh items-center justify-center p-6">

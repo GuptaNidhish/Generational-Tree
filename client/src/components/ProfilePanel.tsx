@@ -1,18 +1,103 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMediaQuery } from '../hooks/useMediaQuery'
 import { slideIn, staggerIn } from '../lib/animations'
 import type { FamilyIndex } from '../lib/family'
 import { childWord, siblingsOf, toRoman } from '../lib/generations'
 import { generationColor } from '../lib/palette'
-import type { Person } from '../types'
+import type { AdminUser, Person, VisitorComment } from '../types'
+import { CommentCard } from './CommentCard'
+import { CommentForm } from './CommentForm'
+import { QuietButton } from './fields'
 import { GenderMark } from './GenderMark'
+import { PersonForm } from './PersonForm'
 
 type Props = {
   person: Person | null
   family: FamilyIndex
+  persons: Person[]
+  describe: (p: Person) => string | null
+  admin: AdminUser | null
+  // open visitor comments about this person (admins only)
+  comments: VisitorComment[]
   onSelect: (id: number) => void
   onShowInTree: (id: number) => void
+  onSaved: (person: Person, kind: 'edited' | 'child') => Promise<void>
+  onCommentsChanged: () => void
   onClose: () => void
+}
+
+// Edit details / add a child, for signed-in admins
+function AdminTools({ person, onSaved }: { person: Person; onSaved: Props['onSaved'] }) {
+  const [mode, setMode] = useState<'edit' | 'child' | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const open = (next: 'edit' | 'child') => {
+    setNotice(null)
+    setMode(next)
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-wine/25 bg-wine/[0.03] p-4" aria-label="Admin tools">
+      <h3 className="font-display text-[1.125rem] text-wine">Admin</h3>
+      {notice && (
+        <p role="status" className="mt-2 text-[0.9375rem] text-ink">
+          {notice}
+        </p>
+      )}
+      {mode === null && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <QuietButton onClick={() => open('edit')}>Edit details</QuietButton>
+          <QuietButton onClick={() => open('child')}>Add a child</QuietButton>
+        </div>
+      )}
+      {mode !== null && (
+        <div className="mt-3">
+          {mode === 'edit' ? (
+            <PersonForm
+              mode="edit"
+              person={person}
+              onCancel={() => setMode(null)}
+              onSaved={async (saved) => {
+                await onSaved(saved, 'edited')
+                setMode(null)
+                setNotice('Saved. The tree now shows the new details.')
+              }}
+            />
+          ) : (
+            <PersonForm
+              mode="child"
+              parent={person}
+              onCancel={() => setMode(null)}
+              onSaved={async (saved) => {
+                await onSaved(saved, 'child')
+                setMode(null)
+                setNotice(`${saved.displayName} has been added to generation ${toRoman(saved.generationNumber)}.`)
+              }}
+            />
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// "Know something we've missed?" for every visitor
+function VisitorNote({ person, persons, describe }: { person: Person; persons: Person[]; describe: Props['describe'] }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="mt-8 border-t border-gold/35 pt-6">
+      <h3 className="font-display text-[1.25rem] text-wine">Know something we've missed?</h3>
+      <p className="mt-1 text-[0.9375rem] text-ink-soft">
+        If a child of {person.firstName || person.displayName} is missing, or something here is wrong, tell the family admins. They will check and update the tree.
+      </p>
+      <div className="mt-4">
+        {open ? (
+          <CommentForm person={person} persons={persons} describe={describe} />
+        ) : (
+          <QuietButton onClick={() => setOpen(true)}>Tell the family admins</QuietButton>
+        )}
+      </div>
+    </section>
+  )
 }
 
 // Root-first chain of ancestors, ending with the person
@@ -56,7 +141,7 @@ function RelativeList({ title, people, onSelect }: { title: string; people: Pers
   )
 }
 
-export function ProfilePanel({ person, family, onSelect, onShowInTree, onClose }: Props) {
+export function ProfilePanel({ person, family, persons, describe, admin, comments, onSelect, onShowInTree, onSaved, onCommentsChanged, onClose }: Props) {
   const panelRef = useRef<HTMLElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
@@ -183,6 +268,20 @@ export function ProfilePanel({ person, family, onSelect, onShowInTree, onClose }
               Show in the tree
             </button>
 
+            {admin && <AdminTools key={`admin-${person.id}`} person={person} onSaved={onSaved} />}
+            {admin && comments.length > 0 && (
+              <section className="mt-6">
+                <h3 className="font-display text-[1.25rem] text-wine">
+                  Comments about {person.firstName || 'this person'} <span className="font-sans text-[0.9375rem] text-ink-soft">({comments.length})</span>
+                </h3>
+                <div className="mt-2 space-y-3">
+                  {comments.map((c) => (
+                    <CommentCard key={c.id} comment={c} showPerson={false} onJump={onSelect} onReviewed={onCommentsChanged} />
+                  ))}
+                </div>
+              </section>
+            )}
+
             <RelativeList title="Parent" people={parent ? [parent] : []} onSelect={onSelect} />
             <RelativeList title="Siblings" people={siblingsOf(family, person.id)} onSelect={onSelect} />
             <RelativeList title="Children" people={family.childrenOf.get(person.id) ?? []} onSelect={onSelect} />
@@ -216,6 +315,8 @@ export function ProfilePanel({ person, family, onSelect, onShowInTree, onClose }
                 })}
               </ol>
             </section>
+
+            <VisitorNote key={`note-${person.id}`} person={person} persons={persons} describe={describe} />
           </div>
         )}
       </aside>

@@ -1,6 +1,6 @@
 import gsap from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
-import { useLayoutEffect, type RefObject } from 'react'
+import { useLayoutEffect, useRef, type RefObject } from 'react'
 import { forgetReveals, markRevealed, registerReveal } from '../lib/animations'
 
 gsap.registerPlugin(ScrollTrigger)
@@ -10,13 +10,18 @@ type Options = {
   progressRef: RefObject<HTMLElement | null>
   onActiveGeneration: (generation: number | null) => void
   onPastHero: (past: boolean) => void
+  // changes when the family data changes, so new cards get their triggers
+  dataVersion: unknown
 }
 
 // All scroll-driven behaviour for the page:
 //  - always: which generation is on screen, whether the hero has gone, reading progress
 //  - only when motion is welcome: hero parallax, section descenders and numerals,
 //    the slight "camera tilt" as each generation arrives, and per-family reveals
-export function useScrollStory({ rootRef, progressRef, onActiveGeneration, onPastHero }: Options) {
+export function useScrollStory({ rootRef, progressRef, onActiveGeneration, onPastHero, dataVersion }: Options) {
+  // the hero's entrance plays once per visit, not after every data refresh
+  const introPlayed = useRef(false)
+
   useLayoutEffect(() => {
     const root = rootRef.current
     if (!root) return
@@ -76,7 +81,10 @@ export function useScrollStory({ rootRef, progressRef, onActiveGeneration, onPas
             gsap.to('[data-hero-text]', { yPercent: -40, opacity: 0.15, ease: 'none', scrollTrigger: leave })
             gsap.to('[data-hero-tree]', { y: 80, scale: depth ? 0.92 : 1, opacity: 0.35, ease: 'none', scrollTrigger: leave })
             gsap.to('[data-hero-foot]', { y: -30, opacity: 0, ease: 'none', scrollTrigger: { ...leave, end: '60% top' } })
-            gsap.from('[data-hero-text] > *', { y: 24, opacity: 0, duration: 0.9, stagger: 0.1, ease: 'power3.out', delay: 0.1 })
+            if (!introPlayed.current) {
+              introPlayed.current = true
+              gsap.from('[data-hero-text] > *', { y: 24, opacity: 0, duration: 0.9, stagger: 0.1, ease: 'power3.out', delay: 0.1 })
+            }
           }
 
           for (const section of sections) {
@@ -140,5 +148,5 @@ export function useScrollStory({ rootRef, progressRef, onActiveGeneration, onPas
       mm.revert()
       ctx.revert()
     }
-  }, [rootRef, progressRef, onActiveGeneration, onPastHero])
+  }, [rootRef, progressRef, onActiveGeneration, onPastHero, dataVersion])
 }

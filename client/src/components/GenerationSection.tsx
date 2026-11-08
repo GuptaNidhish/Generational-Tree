@@ -17,7 +17,9 @@ type Props = {
 function summary({ members, families }: Generation, isFirst: boolean): string {
   if (isFirst && members.length === 1) return 'Where the family line begins'
   const parents = families.filter((f) => f.parent)
-  if (families.length === 1 && parents.length === 1) return `${membersLabel(members.length)}, the children of ${parents[0].parent!.displayName}`
+  if (families.length === 1 && parents.length === 1) {
+    return `${membersLabel(members.length)}, the ${members.length === 1 ? 'child' : 'children'} of ${parents[0].parent!.displayName}`
+  }
   return `${membersLabel(members.length)} in ${families.length} families`
 }
 

@@ -171,8 +171,10 @@ test("the session cookie is HttpOnly and SameSite=Strict", async () => {
   assert.match(header, /Path=\/api/);
 });
 
-test("me is 401 when signed out", async () => {
-  assert.equal((await send("GET", "/api/admin/me")).status, 401);
+test("me is null when signed out", async () => {
+  const res = await send("GET", "/api/admin/me");
+  assert.equal(res.status, 200);
+  assert.equal(await res.json(), null);
 });
 
 test("login is rate limited", async () => {
@@ -224,7 +226,8 @@ test("the owner can't be removed; a removed admin is signed out at once", async 
 
   assert.equal((await send("DELETE", "/api/admin/admins/1", undefined, owner)).status, 400);
   assert.equal((await send("DELETE", "/api/admin/admins/2", undefined, owner)).status, 200);
-  assert.equal((await send("GET", "/api/admin/me", undefined, ravi)).status, 401);
+  assert.equal(await (await send("GET", "/api/admin/me", undefined, ravi)).json(), null);
+  assert.equal((await send("GET", "/api/admin/comments", undefined, ravi)).status, 401);
 });
 
 test("admins change their own password with the current one", async () => {
