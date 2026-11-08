@@ -28,7 +28,7 @@ function fakePrisma({ fail = false } = {}) {
 }
 
 async function serve(prisma) {
-  const server = createApp({ prisma }).listen(0);
+  const server = createApp({ prisma, sessionSecret: "test-secret" }).listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   const base = `http://localhost:${server.address().port}`;
   return { server, get: (path) => fetch(base + path) };

@@ -23,6 +23,7 @@
         "db:seed": "prisma db seed",
         "db:append": "node prisma/append-csv.js",
         "add:member": "node prisma/add-member.js",
+        "admin:owner": "node prisma/create-owner.js",
         "db:studio": "prisma studio",
         "db:reset": "prisma db push --force-reset && npm run db:rls && prisma db seed"
     },
