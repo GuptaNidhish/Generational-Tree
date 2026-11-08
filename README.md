@@ -4,7 +4,7 @@ An interactive family tree of the Gupta family: 127 descendants of Sh. Deviram G
 
 - **Database**: Supabase Postgres, accessed through Prisma 6
 - **API**: Express 5 (`server/app.js`)
-- **Client**: Vite, React 19, TypeScript, React Flow, d3-hierarchy tidy-tree layout, Tailwind CSS v4 (`client/`)
+- **Client**: Vite, React 19, TypeScript, Tailwind CSS v4, GSAP + ScrollTrigger (`client/`)
 
 ## Setup
 
@@ -37,13 +37,14 @@ npm start            # serves the UI and /api from http://localhost:4000
 
 ## Exploring the tree
 
-The tree opens on Sh. Deviram Gupta and is revealed as you explore:
+The site tells the family's story one generation at a time as you scroll down the page:
 
-- **Scroll** (wheel or trackpad) to glide the camera down, up, left and right. Shift + wheel moves sideways. **Pinch** or **Ctrl/⌘ + scroll** zooms. Dragging pans.
-- Each card rises into place the first time it comes into view, and the line from its parent draws itself in. Zooming out to the overview (the ⛶ control) reveals the rest in one cascade.
-- **Select anyone** to trace their bloodline: the haldi line draws generation by generation, and the drawer lists parents, children and line of descent.
-- The left rail always shows which generations are on screen.
-- With *reduced motion* enabled in the OS, everything is shown at once and scrolling pans without easing.
+- **The opening** draws the whole family as a tree: the trunk is Sh. Deviram Gupta, and every leaf is one of the members below, placed on the branch they descend from.
+- **Each generation** has its own section. Members are grouped by the parent they descend from ("Children of …"), and gold branches connect each parent label to their children's cards. Click a parent label to go up to that parent; click "n children" on a card to go down to their family.
+- **Click any card** to open a profile with their parent, siblings, children and line of descent. Each relative links on to their own profile.
+- **Search** finds anyone by name, scrolls to their card, and highlights them with their immediate family (parent, siblings, children). Press Escape or *Clear* to remove the highlight.
+- **The roman numerals** in the header (a dock at the bottom on phones and tablets) show which generation is on screen and jump to any generation. The gold line under the header shows how far down the family you are.
+- With *reduced motion* enabled in the OS, everything is shown at once and jumps happen without animation.
 
 ## API
 
