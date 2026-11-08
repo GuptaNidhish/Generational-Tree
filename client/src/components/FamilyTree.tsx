@@ -13,11 +13,10 @@ import { PersonNode } from './PersonNode'
 const nodeTypes = { person: PersonNode, band: BandNode }
 const edgeTypes = { drawIn: DrawInEdge }
 
-const OPENING_ZOOM = 0.8
+const OPENING_ZOOM = 0.82
 const OPENING_TOP = 0.28 // where the root sits, as a share of the canvas height
-const EDGE_LEAD_MS = 220 // a card rises once the line from its parent is partly drawn
+const EDGE_LEAD_MS = 200 // a card rises once the line from its parent is partly drawn
 const TRACE_STEP_MS = 110 // per-generation delay when tracing a selected bloodline
-
 
 type Props = {
   layout: { nodes: PersonNodeType[]; edges: Edge[] }
@@ -118,8 +117,7 @@ export function FamilyTree({ layout, lineage, selectedId, selectedGenerations, o
     })
   }, [layout, lineage, selectedGenerations, revealed, animate])
 
-
-  // Opening shot: the root, readable, in the upper part of the canvas
+  // Opening shot: the root, readable, centered smoothly in the upper part of the canvas
   const onInit = useCallback(() => {
     const roots = layout.nodes.filter((n) => !hasParent.has(n.id))
     const root = roots[0] ?? layout.nodes[0]
@@ -128,7 +126,7 @@ export function FamilyTree({ layout, lineage, selectedId, selectedGenerations, o
       setCenter(
         root.position.x + NODE_WIDTH / 2,
         root.position.y + NODE_HEIGHT / 2 + (height * (0.5 - OPENING_TOP)) / OPENING_ZOOM,
-        { zoom: OPENING_ZOOM, duration: 0 }
+        { zoom: OPENING_ZOOM, duration: prefersReducedMotion() ? 0 : 350 }
       )
     }
     setReady(true)
@@ -158,12 +156,12 @@ export function FamilyTree({ layout, lineage, selectedId, selectedGenerations, o
         attributionPosition="bottom-left"
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="rgb(31 35 71 / 0.08)" />
-        <Controls showInteractive={false} position="bottom-right" />
+        <Controls showInteractive={false} position="bottom-right" className="!bg-paper/90 !backdrop-blur-xs !shadow-lg" />
         <MiniMap
           position="top-right"
           pannable
           zoomable
-          className="!hidden sm:!block"
+          className="!hidden sm:!block !rounded-lg !border !border-ink/15 !shadow-md"
           nodeColor={(n) => (n.type === 'person' ? generationColor((n as PersonNodeType).data.person.generationNumber) : 'transparent')}
           nodeStrokeWidth={0}
           ariaLabel="Overview of the whole tree"

@@ -8,18 +8,39 @@ const BRACKET_PX = 26
 export type DrawInEdgeData = { mode?: 'hidden' | 'draw' | 'trace'; delay?: number }
 export type DrawInEdgeType = Edge<DrawInEdgeData, 'drawIn'>
 
-// Smooth-step parent→child line that can draw itself in
-function DrawInEdgeComponent({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, data }: EdgeProps<DrawInEdgeType>) {
+// Smooth-step parent→child line that can draw itself in with GSAP-like ease
+function DrawInEdgeComponent({
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  data,
+}: EdgeProps<DrawInEdgeType>) {
   // branch just above the children (a sibling bracket), clear of the ledger rule between rows
-  const [path] = getSmoothStepPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, centerY: targetY - BRACKET_PX })
+  const [path] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    centerY: targetY - BRACKET_PX,
+  })
   const mode = data?.mode
+
   return (
     <path
       d={path}
       pathLength={1}
       fill="none"
       className={`react-flow__edge-path ${mode ? `edge-${mode}` : ''}`}
-      style={mode === 'draw' || mode === 'trace' ? { animationDelay: `${data?.delay ?? 0}ms` } : undefined}
+      style={
+        mode === 'draw' || mode === 'trace'
+          ? { animationDelay: `${data?.delay ?? 0}ms`, transition: 'stroke 0.3s ease, stroke-width 0.3s ease' }
+          : undefined
+      }
     />
   )
 }
