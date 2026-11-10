@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, listComments } from '../api'
 import type { CommentStatus, VisitorComment } from '../types'
 import { CommentCard } from './CommentCard'
@@ -22,13 +22,20 @@ export function CommentsReview({ onClose, onJump, onChanged }: Props) {
   const [comments, setComments] = useState<VisitorComment[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Switching tabs quickly can leave older requests in flight: only the newest may fill the list
+  const latest = useRef(0)
   const load = useCallback(() => {
+    const ticket = ++latest.current
     listComments(status).then(
       (list) => {
+        if (ticket !== latest.current) return
         setComments(list)
         setError(null)
       },
-      (err) => setError(err instanceof ApiError ? err.message : "Couldn't load comments. Try again.")
+      (err) => {
+        if (ticket !== latest.current) return
+        setError(err instanceof ApiError ? err.message : "Couldn't load comments. Try again.")
+      }
     )
   }, [status])
   useEffect(load, [load])
