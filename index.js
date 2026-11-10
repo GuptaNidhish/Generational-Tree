@@ -35,6 +35,7 @@ const app = createApp({
   production,
   corsOrigins: readCorsOrigins(process.env),
   limits: readLimits(process.env),
+  logRequests: production || process.env.LOG_REQUESTS === "1",
   trustProxy: process.env.TRUST_PROXY,
 });
 

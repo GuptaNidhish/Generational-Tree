@@ -168,3 +168,55 @@ test("a server error is a generic 500, logged once on one line with where it hap
   assert.equal(entry.message, "db down");
   assert.match(entry.stack, /db down/);
 });
+
+// ─────────────────────────────────────────────
+// Health, logging and caching of private responses
+// ─────────────────────────────────────────────
+test("readiness checks the database: 200 when it answers, 503 when it doesn't", async () => {
+  const up = await serve();
+  const ok = await up("/api/health/ready");
+  assert.equal(ok.status, 200);
+  assert.deepEqual(await ok.json(), { ok: true, database: "up" });
+
+  const down = await serve({ prisma: fakePrisma({ dbUp: false }) });
+  const logged = await capturingErrors(async () => {
+    const res = await down("/api/health/ready");
+    assert.equal(res.status, 503);
+    assert.deepEqual(await res.json(), { ok: false, database: "down" });
+  });
+  assert.equal(logged.length, 1);
+});
+
+test("readiness is exempt from the rate limit", async () => {
+  const get = await serve({ limits: { api: { limit: 1 } } });
+  await get("/api/tree");
+  assert.equal((await get("/api/tree")).status, 429);
+  assert.equal((await get("/api/health/ready")).status, 200);
+});
+
+test("admin responses are never cached", async () => {
+  const get = await serve();
+  assert.equal((await get("/api/admin/me")).headers.get("cache-control"), "no-store");
+  assert.equal((await get("/api/admin/comments")).headers.get("cache-control"), "no-store");
+});
+
+test("API requests are logged on one line without the query string; health checks aren't", async () => {
+  const get = await serve({ logRequests: true });
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => lines.push(line);
+  try {
+    await get("/api/persons?search=sita");
+    await get("/api/health");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    console.log = original;
+  }
+  assert.equal(lines.length, 1);
+  const entry = JSON.parse(lines[0]);
+  assert.equal(entry.method, "GET");
+  assert.equal(entry.path, "/api/persons");
+  assert.equal(entry.status, 200);
+  assert.equal(typeof entry.ms, "number");
+  assert.doesNotMatch(lines[0], /sita/);
+});

@@ -53,6 +53,16 @@ const CLIENT_ERRORS = {
   "charset.unsupported": "Unsupported character set.",
 };
 
+const READY_TIMEOUT_MS = 5_000;
+
+function withTimeout(promise, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 const isUniqueViolation = (err) => err?.code === "P2002";
 
 // ─────────────────────────────────────────────
@@ -64,10 +74,11 @@ const isUniqueViolation = (err) => err?.code === "P2002";
 //   secureCookies — mark cookies Secure (production, HTTPS)
 //   limits        — override rate limits (tests)
 //   production    — HSTS and upgrade-insecure-requests (HTTPS deployments)
+//   logRequests   — one log line per API request (production)
 //   corsOrigins   — other origins allowed to call the API from a browser; none by default,
 //                   since the client is served from the same origin
 // ─────────────────────────────────────────────
-function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () => true, secureCookies = false, trustProxy, limits = {}, production = false, corsOrigins = [] }) {
+function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () => true, secureCookies = false, trustProxy, limits = {}, production = false, corsOrigins = [], logRequests = false }) {
   if (!sessionSecret) throw new Error("createApp needs a sessionSecret");
   const app = express();
   app.disable("x-powered-by");
@@ -76,6 +87,20 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
   // Same-origin requests need no CORS headers; only listed origins get them
   app.use(cors({ origin: (origin, done) => done(null, corsOrigins.includes(origin)) }));
   app.use(express.json({ limit: "20kb" }));
+
+  // One line per API request: method, path (no query string, which can hold
+  // names), status and time taken. Health probes would only add noise.
+  if (logRequests) {
+    app.use("/api", (req, res, next) => {
+      if (req.path.startsWith("/health")) return next();
+      const started = process.hrtime.bigint();
+      res.on("finish", () => {
+        const ms = Math.round(Number(process.hrtime.bigint() - started) / 1e5) / 10;
+        log("info", { method: req.method, path: req.originalUrl.split("?")[0], status: res.statusCode, ms, ip: req.ip });
+      });
+      next();
+    });
+  }
 
   // Requests that change data must be JSON: a cross-site form can't send that,
   // which (with SameSite=Strict cookies) protects admins from forged requests
@@ -96,7 +121,20 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
   const api = express.Router();
 
   // Health checks come before the rate limit, so the host's probes never hit it
+  // Liveness: the process is up (no database call, so a paused database
+  // doesn't make the host restart a healthy server)
   api.get("/health", (req, res) => res.json({ ok: true }));
+
+  // Readiness: the database answers too
+  api.get("/health/ready", async (req, res) => {
+    try {
+      await withTimeout(prisma.$queryRaw`SELECT 1`, READY_TIMEOUT_MS);
+      res.json({ ok: true, database: "up" });
+    } catch (err) {
+      log("error", { message: "Readiness check: database unreachable", detail: err?.message });
+      res.status(503).json({ ok: false, database: "down" });
+    }
+  });
 
   api.use((req, res, next) => {
     if (apiLimiter.hit(req.ip)) return next();
@@ -189,6 +227,12 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
 
   // ── Admin ───────────────────────────────────
   const admin = express.Router();
+
+  // Admin answers hold private details (visitors' phone numbers): never cache them
+  admin.use((req, res, next) => {
+    res.setHeader("Cache-Control", "no-store");
+    next();
+  });
 
   admin.post("/login", async (req, res) => {
     if (!loginLimiter.hit(req.ip)) {
