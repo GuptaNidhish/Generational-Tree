@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { fetchTree, listComments } from './api'
+import { ApiError, fetchTree, listComments } from './api'
 import { AdminBar } from './components/AdminBar'
+import { ErrorCard } from './components/ErrorBoundary'
 import { AdminLogin } from './components/AdminLogin'
 import { BackToTop } from './components/BackToTop'
 import { ChangePassword } from './components/ChangePassword'
@@ -330,8 +331,8 @@ export default function App() {
       .then((data) => {
         if (active) setState({ status: 'ready', data })
       })
-      .catch((e: Error) => {
-        if (active) setState({ status: 'error', message: e.message })
+      .catch((e: unknown) => {
+        if (active) setState({ status: 'error', message: loadErrorMessage(e) })
       })
     return () => {
       active = false
@@ -373,25 +374,35 @@ export default function App() {
 
   if (state.status === 'ready') return <FamilyStory data={state.data} reload={reload} />
 
-  return (
-    <div className="flex min-h-svh items-center justify-center p-6">
-      {state.status === 'loading' ? (
-        <div className="flex flex-col items-center gap-4" role="status">
-          <div className="size-9 animate-spin rounded-full border-2 border-gold border-t-transparent motion-reduce:animate-none" />
-          <p className="font-display text-[1.75rem] text-wine">Opening the vanshavali</p>
-        </div>
-      ) : (
-        <div role="alert" className="max-w-md rounded-2xl border border-gold/50 bg-paper p-7 shadow-[0_18px_40px_-20px_rgb(74_14_26_/_0.5)]">
-          <h1 className="font-display text-[1.75rem] leading-tight text-wine">The family tree didn't load</h1>
-          <p className="mt-3 text-ink">{state.message}.</p>
+  if (state.status === 'error') {
+    return (
+      <ErrorCard title="The family tree didn't load" action="Try again" onAction={retry}>
+        <p className="mt-3 text-ink">{withFullStop(state.message)}</p>
+        {import.meta.env.DEV && (
           <p className="mt-2 text-[0.9375rem] text-ink-soft">
             Check that the API server is running (<code className="rounded bg-gold/15 px-1">npm run dev</code> in the project root), then try again.
           </p>
-          <button type="button" onClick={retry} className="mt-6 w-full cursor-pointer rounded-full bg-wine py-2.5 font-medium text-paper hover:bg-wine-deep">
-            Try again
-          </button>
-        </div>
-      )}
+        )}
+      </ErrorCard>
+    )
+  }
+
+  return (
+    <div className="flex min-h-svh items-center justify-center p-6">
+      <div className="flex flex-col items-center gap-4" role="status">
+        <div className="size-9 animate-spin rounded-full border-2 border-gold border-t-transparent motion-reduce:animate-none" />
+        <p className="font-display text-[1.75rem] text-wine">Opening the vanshavali</p>
+      </div>
     </div>
   )
 }
+
+// Visitors see the server's own message, or a plain one for network failures;
+// developers see the raw error
+function loadErrorMessage(e: unknown): string {
+  if (e instanceof ApiError && e.status > 0) return e.message
+  if (import.meta.env.DEV && e instanceof Error) return e.message
+  return "We couldn't reach the family tree. Check your connection and try again."
+}
+
+const withFullStop = (message: string) => (/[.!?]$/.test(message) ? message : `${message}.`)
