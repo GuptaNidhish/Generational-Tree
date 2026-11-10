@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { checkEnv } = require("./config");
+const { checkEnv, readCorsOrigins } = require("./config");
 
 const goodProduction = {
   NODE_ENV: "production",
@@ -44,4 +44,9 @@ test("development never fails on configuration", () => {
   const { production, errors } = checkEnv({});
   assert.equal(production, false);
   assert.deepEqual(errors, []);
+});
+
+test("CORS_ORIGINS is a comma-separated list, empty by default", () => {
+  assert.deepEqual(readCorsOrigins({}), []);
+  assert.deepEqual(readCorsOrigins({ CORS_ORIGINS: " https://a.example, https://b.example/ ,," }), ["https://a.example", "https://b.example"]);
 });

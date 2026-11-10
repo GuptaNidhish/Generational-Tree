@@ -63,3 +63,21 @@ test("production adds HSTS and upgrade-insecure-requests", async () => {
   assert.match(res.headers.get("strict-transport-security"), /max-age=15552000/);
   assert.match(res.headers.get("content-security-policy"), /upgrade-insecure-requests/);
 });
+
+// ─────────────────────────────────────────────
+// CORS: same-origin by default, an explicit allowlist otherwise
+// ─────────────────────────────────────────────
+test("other sites get no CORS access by default", async () => {
+  const get = await serve();
+  const res = await get("/api/tree", { headers: { Origin: "https://evil.example" } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("access-control-allow-origin"), null);
+});
+
+test("origins in the allowlist get CORS access, others don't", async () => {
+  const get = await serve({ corsOrigins: ["https://family.example"] });
+  const allowed = await get("/api/tree", { headers: { Origin: "https://family.example" } });
+  assert.equal(allowed.headers.get("access-control-allow-origin"), "https://family.example");
+  const other = await get("/api/tree", { headers: { Origin: "https://evil.example" } });
+  assert.equal(other.headers.get("access-control-allow-origin"), null);
+});

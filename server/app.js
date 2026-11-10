@@ -45,14 +45,17 @@ const isUniqueViolation = (err) => err?.code === "P2002";
 //   secureCookies — mark cookies Secure (production, HTTPS)
 //   limits        — override rate limits (tests)
 //   production    — HSTS and upgrade-insecure-requests (HTTPS deployments)
+//   corsOrigins   — other origins allowed to call the API from a browser; none by default,
+//                   since the client is served from the same origin
 // ─────────────────────────────────────────────
-function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () => true, secureCookies = false, trustProxy, limits = {}, production = false }) {
+function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () => true, secureCookies = false, trustProxy, limits = {}, production = false, corsOrigins = [] }) {
   if (!sessionSecret) throw new Error("createApp needs a sessionSecret");
   const app = express();
   app.disable("x-powered-by");
   if (trustProxy) app.set("trust proxy", trustProxy);
   app.use(securityHeaders({ production }));
-  app.use(cors());
+  // Same-origin requests need no CORS headers; only listed origins get them
+  app.use(cors({ origin: (origin, done) => done(null, corsOrigins.includes(origin)) }));
   app.use(express.json({ limit: "20kb" }));
 
   // Requests that change data must be JSON: a cross-site form can't send that,

@@ -38,4 +38,12 @@ function checkEnv(env) {
   return { production, errors, warnings };
 }
 
-module.exports = { checkEnv, MIN_SECRET_LENGTH };
+// "https://a.example, https://b.example" → ["https://a.example", "https://b.example"]
+function readCorsOrigins(env) {
+  return (env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+}
+
+module.exports = { checkEnv, readCorsOrigins, MIN_SECRET_LENGTH };
