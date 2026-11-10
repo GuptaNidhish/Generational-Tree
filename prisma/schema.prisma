@@ -29,6 +29,8 @@ model Person {
   // Relations
   parentOf         ParentChild[] @relation("ParentRelation")
   childOf          ParentChild[] @relation("ChildRelation")
+  comments         Comment[]     @relation("CommentAbout")
+  linkedComments   Comment[]     @relation("CommentLinkedPerson")
 
   @@map("person")
 }
@@ -48,4 +50,70 @@ model ParentChild {
   // Prevent duplicate parent-child pairs
   @@unique([parentId, childId])
   @@map("parent_child")
+}
+
+// ─────────────────────────────────────────────
+// Table 3: Admin (people who may edit the tree)
+// Exactly one owner (enforced by a partial unique index in enable-rls.sql);
+// only the owner can create or remove admins.
+// ─────────────────────────────────────────────
+enum AdminRole {
+  owner
+  admin
+}
+
+model Admin {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  role         AdminRole @default(admin)
+  createdById  Int?      @map("created_by_id")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  resolved Comment[]
+
+  @@map("admin")
+}
+
+// ─────────────────────────────────────────────
+// Table 4: Comment (visitor notes about a person, reviewed by admins)
+// ─────────────────────────────────────────────
+enum CommentStatus {
+  new
+  resolved
+  dismissed
+}
+
+// How the commenter connects to the tree
+enum CommenterLink {
+  self // they are in the tree
+  ancestor // an ancestor of theirs is
+  none // neither, or not sure
+}
+
+model Comment {
+  id             Int           @id @default(autoincrement())
+  personId       Int           @map("person_id")
+  name           String
+  phone          String
+  link           CommenterLink
+  linkedPersonId Int?          @map("linked_person_id")
+  relation       String?
+  message        String
+  status         CommentStatus @default(new)
+  adminNote      String?       @map("admin_note")
+  resolvedById   Int?          @map("resolved_by_id")
+  resolvedAt     DateTime?     @map("resolved_at") @db.Timestamptz
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  person       Person  @relation("CommentAbout", fields: [personId], references: [id], onDelete: Cascade)
+  linkedPerson Person? @relation("CommentLinkedPerson", fields: [linkedPersonId], references: [id], onDelete: SetNull)
+  resolvedBy   Admin?  @relation(fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([personId])
+  @@index([linkedPersonId])
+  @@index([resolvedById])
+  @@index([status, createdAt])
+  @@index([phone, createdAt])
+  @@map("comment")
 }

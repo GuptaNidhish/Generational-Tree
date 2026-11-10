@@ -1,13 +1,17 @@
-// Sequential generation scale: bahi-ledger red for the eldest, through ochre and
-// green, to indigo for the youngest. Used for card rules and generation chips.
+// One muted tone per generation, from the wine of the eldest through rust,
+// ochre and olive to slate, then plum for generations added later. Used for the thin rule on each
+// card and the generation marks, so a card's generation reads at a glance.
 const GENERATION_COLORS = [
-  '#9B1C22', // 1
-  '#B4432B', // 2
-  '#B86A2E', // 3
-  '#A68A2C', // 4
-  '#5E8549', // 5
-  '#2E7673', // 6
-  '#34508F', // 7
+  '#6B1626', // I
+  '#8A3324', // II
+  '#97582A', // III
+  '#82702F', // IV
+  '#5C6B3E', // V
+  '#3F6360', // VI
+  '#3E4F6E', // VII
+  '#5B4670', // VIII
+  '#6E4A5E', // IX
+  '#55606A', // X
 ]
 
 export function generationColor(generation: number): string {

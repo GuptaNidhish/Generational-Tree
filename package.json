@@ -17,26 +17,33 @@
         "dev": "nodemon --watch index.js --watch server index.js",
         "start": "node index.js",
         "client:dev": "npm --prefix client run dev",
-        "build": "npm --prefix client install && npm --prefix client run build",
+        "build": "prisma generate && npm --prefix client ci --include=dev && npm --prefix client run build",
         "db:push": "prisma db push && npm run db:rls",
         "db:rls": "prisma db execute --file prisma/enable-rls.sql --schema prisma/schema.prisma",
         "db:seed": "prisma db seed",
         "db:append": "node prisma/append-csv.js",
+        "db:check": "node prisma/check-integrity.js",
+        "db:backup": "node prisma/backup.js",
         "add:member": "node prisma/add-member.js",
+        "admin:owner": "node prisma/create-owner.js",
         "db:studio": "prisma studio",
-        "db:reset": "prisma db push --force-reset && npm run db:rls && prisma db seed"
+        "db:reset": "node prisma/confirm-reset.js && prisma db push --force-reset && npm run db:rls && prisma db seed"
     },
     "prisma": {
         "seed": "node prisma/seed.js"
     },
     "dependencies": {
         "@prisma/client": "^6.4.1",
+        "compression": "^1.8.2",
         "cors": "^2.8.6",
         "csv-parse": "^7.0.3",
-        "express": "^5.3.0",
-        "nodemon": "^3.1.14"
+        "express": "^5.3.0"
     },
     "devDependencies": {
+        "nodemon": "^3.1.14",
         "prisma": "^6.4.1"
+    },
+    "engines": {
+        "node": ">=20.19"
     }
 }

@@ -8,3 +8,4 @@ client/node_modules/
 IMG_*.JPG
 *.numbers
 .playwright-mcp/
+backups/

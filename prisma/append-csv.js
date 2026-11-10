@@ -81,6 +81,9 @@ async function main() {
           data: { parentId: fatherId, childId: person.id },
         });
         console.log(`   🔗 Linked to Father (ID ${fatherId}: ${fatherExists.displayName})`);
+        if (fatherExists.generationNumber + 1 !== person.generationNumber) {
+          console.warn(`   ⚠️ Warning: ${person.displayName} is in generation ${person.generationNumber}, but their father is in generation ${fatherExists.generationNumber} (expected ${fatherExists.generationNumber + 1}). Fix generation_number, or check with: npm run db:check`);
+        }
       } else {
         console.warn(`   ⚠️ Warning: Father with ID ${fatherId} not found in database!`);
       }
@@ -95,6 +98,9 @@ async function main() {
           data: { parentId: motherId, childId: person.id },
         });
         console.log(`   🔗 Linked to Mother (ID ${motherId}: ${motherExists.displayName})`);
+        if (motherExists.generationNumber + 1 !== person.generationNumber) {
+          console.warn(`   ⚠️ Warning: ${person.displayName} is in generation ${person.generationNumber}, but their mother is in generation ${motherExists.generationNumber} (expected ${motherExists.generationNumber + 1}). Fix generation_number, or check with: npm run db:check`);
+        }
       } else {
         console.warn(`   ⚠️ Warning: Mother with ID ${motherId} not found in database!`);
       }
@@ -104,6 +110,7 @@ async function main() {
   }
 
   console.log(`\n🎉 Successfully appended ${addedCount} member(s)! Existing data remained untouched.`);
+  console.log(`💡 Check the tree is still consistent with: npm run db:check`);
   console.log(`💡 You can view and verify the updated tree with: npm run db:studio\n`);
 }
 

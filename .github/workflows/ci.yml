@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Install
+        run: |
+          npm ci
+          npm --prefix client ci
+
+      # Generating the client needs no database; tests use an in-memory stand-in
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: API tests
+        run: npm test
+
+      - name: Client tests
+        run: npm --prefix client test
+
+      - name: Lint
+        run: npm --prefix client run lint
+
+      # Type checking and the production build (tsc -b && vite build)
+      - name: Build
+        run: npm --prefix client run build
+
+      - name: Audit production dependencies
+        run: |
+          npm audit --omit=dev --audit-level=high
+          npm --prefix client audit --omit=dev --audit-level=high
