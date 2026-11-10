@@ -141,6 +141,13 @@ test("sessions reject tampered and expired tokens", () => {
   assert.equal(auth.verifySession(old, SECRET), null);
 });
 
+test("a linked person id must fit the database's integer range", () => {
+  const { validateComment } = require("./validate");
+  const body = { name: "Asha", phone: "9876543210", link: "self", relation: "me", message: "Hello there" };
+  assert.ok(validateComment({ ...body, linkedPersonId: 2147483647 }).value);
+  assert.ok(validateComment({ ...body, linkedPersonId: 2147483648 }).error);
+});
+
 test("passwords hash and verify", async () => {
   const hash = await auth.hashPassword("correct horse battery");
   assert.ok(await auth.verifyPassword("correct horse battery", hash));

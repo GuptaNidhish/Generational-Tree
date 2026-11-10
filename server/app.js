@@ -5,7 +5,7 @@ const path = require("path");
 const auth = require("./auth");
 const { createLimiter } = require("./rateLimit");
 const { securityHeaders } = require("./security");
-const { validateComment, validatePerson, validateUsername } = require("./validate");
+const { MAX_ID, validateComment, validatePerson, validateUsername } = require("./validate");
 
 // Public person fields (timestamps are internal)
 const PERSON_SELECT = {
@@ -21,10 +21,15 @@ const PERSON_SELECT = {
 
 const PERSON_ORDER = [{ generationNumber: "asc" }, { id: "asc" }];
 
-// Parse a strictly-integer string; returns null for anything else
+// Parse a strictly-integer string that fits the database's INT4 columns;
+// returns null for anything else (arrays from repeated query keys included)
 function toInt(value) {
-  return /^\d+$/.test(value ?? "") ? parseInt(value, 10) : null;
+  if (typeof value !== "string" || !/^\d{1,10}$/.test(value)) return null;
+  const n = parseInt(value, 10);
+  return n <= MAX_ID ? n : null;
 }
+
+const MAX_SEARCH_LENGTH = 100;
 
 function badRequest(res, error) {
   return res.status(400).json({ error });
@@ -91,7 +96,9 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
   // ?search=<name fragment>&generation=<n>
   api.get("/persons", async (req, res) => {
     const where = {};
+    if (req.query.search !== undefined && typeof req.query.search !== "string") return badRequest(res, "search must be a single value");
     const search = req.query.search?.trim();
+    if (search && search.length > MAX_SEARCH_LENGTH) return badRequest(res, `search must be at most ${MAX_SEARCH_LENGTH} characters`);
     if (search) where.displayName = { contains: search, mode: "insensitive" };
     if (req.query.generation !== undefined) {
       const generation = toInt(req.query.generation);

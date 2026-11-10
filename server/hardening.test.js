@@ -81,3 +81,21 @@ test("origins in the allowlist get CORS access, others don't", async () => {
   const other = await get("/api/tree", { headers: { Origin: "https://evil.example" } });
   assert.equal(other.headers.get("access-control-allow-origin"), null);
 });
+
+// ─────────────────────────────────────────────
+// Input that used to cause 500s
+// ─────────────────────────────────────────────
+test("a repeated or overlong search is a 400, not a crash", async () => {
+  const get = await serve();
+  assert.equal((await get("/api/persons?search=ram&search=sita")).status, 400);
+  assert.equal((await get(`/api/persons?search=${"a".repeat(101)}`)).status, 400);
+  assert.equal((await get(`/api/persons?search=${"a".repeat(100)}`)).status, 200);
+});
+
+test("ids beyond the database's integer range are rejected, not sent to the database", async () => {
+  const get = await serve();
+  assert.equal((await get("/api/persons/2147483648")).status, 400);
+  assert.equal((await get("/api/persons/99999999999999999999")).status, 400);
+  assert.equal((await get("/api/persons?generation=2147483648")).status, 400);
+  assert.equal((await get("/api/persons/2147483647")).status, 404);
+});

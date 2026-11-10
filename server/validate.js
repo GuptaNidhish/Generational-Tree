@@ -1,6 +1,10 @@
 // Input checks for admin edits and visitor comments. Each returns
 // { value } on success or { error } with a message fit to show the user.
 
+// Ids are Postgres INT4; anything larger makes the query itself fail
+const MAX_ID = 2_147_483_647;
+const isId = (v) => Number.isInteger(v) && v >= 1 && v <= MAX_ID;
+
 const text = (v) => (typeof v === "string" ? v.trim().replace(/\s+/g, " ") : "");
 
 // Indian mobiles may be typed as 98765 43210, 098765-43210, +91 98765 43210 …
@@ -60,7 +64,7 @@ function validateComment(body) {
 
   let linked = { linkedPersonId: null, relation: null };
   if (link !== "none") {
-    if (!Number.isInteger(linkedPersonId) || linkedPersonId < 1) {
+    if (!isId(linkedPersonId)) {
       return { error: link === "self" ? "Please choose which person in the tree is you." : "Please choose your ancestor in the tree." };
     }
     if (!relation) return { error: "Please say how you are related." };
@@ -82,4 +86,4 @@ function validateUsername(input) {
   return { value: username };
 }
 
-module.exports = { normalisePhone, validatePerson, validateComment, validateUsername };
+module.exports = { MAX_ID, normalisePhone, validatePerson, validateComment, validateUsername };
