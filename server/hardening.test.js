@@ -99,3 +99,16 @@ test("ids beyond the database's integer range are rejected, not sent to the data
   assert.equal((await get("/api/persons?generation=2147483648")).status, 400);
   assert.equal((await get("/api/persons/2147483647")).status, 404);
 });
+
+// ─────────────────────────────────────────────
+// General API rate limit
+// ─────────────────────────────────────────────
+test("the API is rate limited per visitor, with Retry-After; health checks are not", async () => {
+  const get = await serve({ limits: { api: { limit: 3 } } });
+  for (let i = 0; i < 3; i++) assert.equal((await get("/api/tree")).status, 200);
+  const blocked = await get("/api/persons");
+  assert.equal(blocked.status, 429);
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
+  assert.match((await blocked.json()).error, /Too many requests/);
+  assert.equal((await get("/api/health")).status, 200);
+});

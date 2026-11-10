@@ -3,7 +3,7 @@ const path = require("path");
 const { PrismaClient } = require("@prisma/client");
 const { createApp } = require("./server/app");
 const { createTurnstileVerifier } = require("./server/turnstile");
-const { checkEnv, readCorsOrigins } = require("./server/config");
+const { checkEnv, readCorsOrigins, readLimits } = require("./server/config");
 
 const PORT = process.env.PORT || 4000;
 
@@ -33,6 +33,7 @@ const app = createApp({
   secureCookies: production,
   production,
   corsOrigins: readCorsOrigins(process.env),
+  limits: readLimits(process.env),
   trustProxy: process.env.TRUST_PROXY,
 });
 

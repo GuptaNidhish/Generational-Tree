@@ -3,7 +3,7 @@ const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
 const auth = require("./auth");
-const { createLimiter } = require("./rateLimit");
+const { createLimiter, createWindowCounter } = require("./rateLimit");
 const { securityHeaders } = require("./security");
 const { MAX_ID, validateComment, validatePerson, validateUsername } = require("./validate");
 
@@ -33,6 +33,11 @@ const MAX_SEARCH_LENGTH = 100;
 
 function badRequest(res, error) {
   return res.status(400).json({ error });
+}
+
+function tooMany(res, retryAfterSeconds, error) {
+  res.setHeader("Retry-After", String(retryAfterSeconds));
+  return res.status(429).json({ error });
 }
 
 const SUMMARY_SELECT = { id: true, displayName: true, generationNumber: true };
@@ -72,6 +77,8 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
     next();
   });
 
+  // Every API request per visitor (generous: a page view makes two or three)
+  const apiLimiter = createWindowCounter({ limit: 300, windowMs: 60_000, ...limits.api });
   const loginLimiter = createLimiter({ limit: 10, windowMs: 15 * 60_000, ...limits.login });
   const commentLimiter = createLimiter({ limit: 5, windowMs: 60 * 60_000, ...limits.comment });
   const phoneLimit = limits.phonePerDay ?? PHONE_LIMIT_PER_DAY;
@@ -79,7 +86,13 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
 
   const api = express.Router();
 
+  // Health checks come before the rate limit, so the host's probes never hit it
   api.get("/health", (req, res) => res.json({ ok: true }));
+
+  api.use((req, res, next) => {
+    if (apiLimiter.hit(req.ip)) return next();
+    tooMany(res, apiLimiter.retryAfter(req.ip), "Too many requests. Please wait a minute and try again.");
+  });
 
   // Whole lineage in one payload — the client lays it out
   api.get("/tree", async (req, res) => {
@@ -150,12 +163,12 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
     }
 
     if (!commentLimiter.hit(req.ip)) {
-      return res.status(429).json({ error: "Too many messages from this connection. Please try again in an hour." });
+      return tooMany(res, commentLimiter.retryAfter(req.ip), "Too many messages from this connection. Please try again in an hour.");
     }
     const since = new Date(Date.now() - 86_400_000);
     const fromPhone = await prisma.comment.count({ where: { phone: value.phone, createdAt: { gte: since } } });
     if (fromPhone >= phoneLimit) {
-      return res.status(429).json({ error: "We've had several messages from this number today. Please try again tomorrow." });
+      return tooMany(res, 86_400, "We've had several messages from this number today. Please try again tomorrow.");
     }
     if (!(await verifyHuman(req.body.turnstileToken, req.ip))) {
       return badRequest(res, "We couldn't confirm you're not a robot. Please complete the check and send again.");
@@ -170,7 +183,7 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
 
   admin.post("/login", async (req, res) => {
     if (!loginLimiter.hit(req.ip)) {
-      return res.status(429).json({ error: "Too many sign-in attempts. Please wait 15 minutes and try again." });
+      return tooMany(res, loginLimiter.retryAfter(req.ip), "Too many sign-in attempts. Please wait 15 minutes and try again.");
     }
     const username = typeof req.body?.username === "string" ? req.body.username.trim().toLowerCase() : "";
     const password = typeof req.body?.password === "string" ? req.body.password : "";

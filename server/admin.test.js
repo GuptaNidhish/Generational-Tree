@@ -190,7 +190,9 @@ test("login is rate limited", async () => {
   await start({ limits: { login: { limit: 2 } } });
   await send("POST", "/api/admin/login", { username: "x", password: "y" });
   await send("POST", "/api/admin/login", { username: "x", password: "y" });
-  assert.equal((await send("POST", "/api/admin/login", { username: "x", password: "y" })).status, 429);
+  const blocked = await send("POST", "/api/admin/login", { username: "x", password: "y" });
+  assert.equal(blocked.status, 429);
+  assert.ok(Number(blocked.headers.get("retry-after")) > 0);
 });
 
 test("changing data needs JSON", async () => {
