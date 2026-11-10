@@ -5,6 +5,7 @@ const path = require("path");
 const auth = require("./auth");
 const { createLimiter, createWindowCounter } = require("./rateLimit");
 const { securityHeaders } = require("./security");
+const { log } = require("./log");
 const { MAX_ID, validateComment, validatePerson, validateUsername } = require("./validate");
 
 // Public person fields (timestamps are internal)
@@ -43,6 +44,14 @@ function tooMany(res, retryAfterSeconds, error) {
 const SUMMARY_SELECT = { id: true, displayName: true, generationNumber: true };
 const COMMENT_STATUSES = ["new", "resolved", "dismissed"];
 const PHONE_LIMIT_PER_DAY = 5;
+
+// body-parser's error types → messages fit to show
+const CLIENT_ERRORS = {
+  "entity.parse.failed": "Malformed JSON.",
+  "entity.too.large": "Request too large.",
+  "encoding.unsupported": "Unsupported content encoding.",
+  "charset.unsupported": "Unsupported character set.",
+};
 
 const isUniqueViolation = (err) => err?.code === "P2002";
 
@@ -341,10 +350,14 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
     app.get("/{*splat}", (req, res) => res.sendFile(path.join(staticDir, "index.html")));
   }
 
-  // Express 5 forwards rejected async handlers here
-  // eslint-disable-next-line no-unused-vars
+  // Express 5 forwards rejected async handlers here. Mistakes in the request
+  // (malformed JSON, a body over the limit) keep their 4xx status and aren't
+  // logged; anything else is a generic 500, logged on one line
   app.use((err, req, res, next) => {
-    console.error(err);
+    if (res.headersSent) return next(err);
+    const status = Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 ? err.status : 500;
+    if (status < 500) return res.status(status).json({ error: CLIENT_ERRORS[err.type] ?? "Bad request." });
+    log("error", { method: req.method, path: req.originalUrl.split("?")[0], message: err?.message, stack: err?.stack });
     res.status(500).json({ error: "Internal server error" });
   });
 

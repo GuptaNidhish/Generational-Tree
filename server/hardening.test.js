@@ -112,3 +112,59 @@ test("the API is rate limited per visitor, with Retry-After; health checks are n
   assert.match((await blocked.json()).error, /Too many requests/);
   assert.equal((await get("/api/health")).status, 200);
 });
+
+// ─────────────────────────────────────────────
+// Errors: the client's mistakes are 4xx, not logged as crashes
+// ─────────────────────────────────────────────
+async function capturingErrors(fn) {
+  const logged = [];
+  const original = console.error;
+  console.error = (...args) => logged.push(args);
+  try {
+    await fn();
+  } finally {
+    console.error = original;
+  }
+  return logged;
+}
+
+test("malformed JSON is a 400 and isn't logged as a server error", async () => {
+  const request = await serve();
+  const logged = await capturingErrors(async () => {
+    const res = await request("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{not json" });
+    assert.equal(res.status, 400);
+    assert.deepEqual(await res.json(), { error: "Malformed JSON." });
+  });
+  assert.equal(logged.length, 0);
+});
+
+test("a body over 20 KB is a 413", async () => {
+  const request = await serve();
+  const res = await request("/api/admin/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: "x", password: "y".repeat(25_000) }),
+  });
+  assert.equal(res.status, 413);
+  assert.deepEqual(await res.json(), { error: "Request too large." });
+});
+
+test("a server error is a generic 500, logged once on one line with where it happened", async () => {
+  const broken = fakePrisma();
+  broken.person.findMany = async () => {
+    throw new Error("db down");
+  };
+  const get = await serve({ prisma: broken });
+  const logged = await capturingErrors(async () => {
+    const res = await get("/api/tree?secret=1");
+    assert.equal(res.status, 500);
+    assert.deepEqual(await res.json(), { error: "Internal server error" });
+  });
+  assert.equal(logged.length, 1);
+  const entry = JSON.parse(logged[0][0]);
+  assert.equal(entry.level, "error");
+  assert.equal(entry.method, "GET");
+  assert.equal(entry.path, "/api/tree");
+  assert.equal(entry.message, "db down");
+  assert.match(entry.stack, /db down/);
+});
