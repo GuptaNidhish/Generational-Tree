@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ApiError, sendComment } from '../api'
 import { formatPhone, normalisePhone } from '../lib/forms'
 import type { Person, CommenterLink } from '../types'
@@ -19,6 +19,9 @@ const LINKS: { value: CommenterLink; label: string }[] = [
   { value: 'none', label: 'No / not sure' },
 ]
 
+const CHECK_UNAVAILABLE =
+  "The “not a robot” check couldn't load. An ad blocker or a weak connection can stop it: please allow this site in your blocker, or try again later."
+
 // A visitor tells the family admins about someone or something we've missed
 export function CommentForm({ person, persons, describe }: Props) {
   const [name, setName] = useState('')
@@ -33,6 +36,11 @@ export function CommentForm({ person, persons, describe }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [sent, setSent] = useState<{ name: string; phone: string } | null>(null)
+  const [checkUnavailable, setCheckUnavailable] = useState(false)
+  const turnstileUnavailable = useCallback(() => {
+    setCheckUnavailable(true)
+    setError(CHECK_UNAVAILABLE)
+  }, [])
 
   const normalised = normalisePhone(phone)
   const phoneError = phoneTouched && phone && !normalised ? 'Enter a mobile number like 98765 43210, or +44 7700 900123 from abroad.' : null
@@ -45,7 +53,7 @@ export function CommentForm({ person, persons, describe }: Props) {
     if (inTree && !linked) return link === 'self' ? 'Please choose which person in the tree is you.' : 'Please choose your ancestor in the tree.'
     if (inTree && !relation.trim()) return 'Please say how you are related.'
     if (message.trim().length < 5) return 'Please tell us a little more in your message.'
-    if (turnstileEnabled && !token) return 'Please complete the check below so we know you are not a robot.'
+    if (turnstileEnabled && !token) return checkUnavailable ? CHECK_UNAVAILABLE : 'Please complete the check below so we know you are not a robot.'
     return null
   }
 
@@ -171,7 +179,7 @@ export function CommentForm({ person, persons, describe }: Props) {
         <textarea className={`${inputClass} min-h-28`} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={2000} />
       </Field>
 
-      <Turnstile onToken={setToken} resetKey={resetKey} />
+      <Turnstile onToken={setToken} resetKey={resetKey} onUnavailable={turnstileUnavailable} />
       <FormError message={error} />
       <PrimaryButton type="submit" busy={busy} className="w-full sm:w-auto">
         Send to the family admins

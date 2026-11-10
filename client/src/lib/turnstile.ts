@@ -19,7 +19,11 @@ export function loadTurnstile(): Promise<TurnstileApi> {
     const script = document.createElement('script')
     script.src = SCRIPT
     script.async = true
-    script.onload = () => (window.turnstile ? resolve(window.turnstile) : reject(new Error('Turnstile did not load')))
+    script.onload = () => {
+      if (window.turnstile) return resolve(window.turnstile)
+      loading = null // let a later form try again
+      reject(new Error('Turnstile did not load'))
+    }
     script.onerror = () => {
       loading = null
       reject(new Error('Turnstile did not load'))

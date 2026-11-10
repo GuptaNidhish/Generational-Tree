@@ -60,7 +60,7 @@ export function PersonForm(props: Props) {
       const saved = props.mode === 'edit' ? await updatePerson(props.person.id, input) : await addChild(props.parent.id, input)
       await props.onSaved(saved)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't reach the server. Your changes weren't saved; try again.")
+      setError(err instanceof ApiError && err.status > 0 ? err.message : "Couldn't reach the server. Your changes weren't saved; try again.")
       setBusy(false)
     }
   }

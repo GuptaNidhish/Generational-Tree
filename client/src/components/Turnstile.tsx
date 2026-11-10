@@ -5,10 +5,12 @@ type Props = {
   onToken: (token: string) => void // keep stable (e.g. a state setter)
   // bump to get a fresh challenge (tokens are single-use)
   resetKey: number
+  // the script couldn't load (blocked or offline); keep stable too
+  onUnavailable?: () => void
 }
 
 // Cloudflare's free "are you human" check. Renders nothing when no site key is configured.
-export function Turnstile({ onToken, resetKey }: Props) {
+export function Turnstile({ onToken, resetKey, onUnavailable }: Props) {
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -26,12 +28,16 @@ export function Turnstile({ onToken, resetKey }: Props) {
           'error-callback': () => onToken(''),
         })
       })
-      .catch(() => onToken(''))
+      .catch(() => {
+        if (cancelled) return
+        onToken('')
+        onUnavailable?.()
+      })
     return () => {
       cancelled = true
       if (widget) window.turnstile?.remove(widget)
     }
-  }, [resetKey, onToken])
+  }, [resetKey, onToken, onUnavailable])
 
   if (!SITE_KEY) return null
   return <div ref={ref} className="min-h-[65px]" />

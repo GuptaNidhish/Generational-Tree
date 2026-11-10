@@ -25,6 +25,8 @@ export function useAdmin() {
   const signOut = useCallback(async () => {
     try {
       await apiSignOut()
+    } catch {
+      // the server didn't clear the cookie (offline?); show the visitor view anyway
     } finally {
       setAdmin(null)
     }

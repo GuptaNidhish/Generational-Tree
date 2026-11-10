@@ -11,13 +11,27 @@ export class ApiError extends Error {
   }
 }
 
+// Long enough for a free-tier server waking from sleep (up to about a minute)
+const TIMEOUT_MS = 60_000
+
+// status 0: no usable answer from the server at all
+const NO_ANSWER = "We couldn't reach the server. Check your connection and try again."
+const TOO_SLOW = 'The server took too long to answer. Please try again.'
+const NOT_JSON = 'The server sent an unexpected answer. Please try again in a moment.'
+
 async function request<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
-  const res = await fetch(path, {
-    method: init.method ?? 'GET',
-    credentials: 'same-origin',
-    headers: init.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-  })
+  let res: Response
+  try {
+    res = await fetch(path, {
+      method: init.method ?? 'GET',
+      credentials: 'same-origin',
+      headers: init.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    })
+  } catch (e) {
+    throw new ApiError(e instanceof DOMException && e.name === 'TimeoutError' ? TOO_SLOW : NO_ANSWER, 0)
+  }
   if (!res.ok) {
     let message = `The server answered ${res.status} ${res.statusText}`.trim()
     try {
@@ -32,7 +46,12 @@ async function request<T>(path: string, init: { method?: string; body?: unknown 
     }
     throw new ApiError(message, res.status)
   }
-  return res.json()
+  try {
+    return (await res.json()) as T
+  } catch {
+    // e.g. an HTML page from the host while the server is starting
+    throw new ApiError(NOT_JSON, 0)
+  }
 }
 
 export const fetchTree = () => request<TreeData>('/api/tree')

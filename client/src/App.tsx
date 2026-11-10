@@ -351,12 +351,17 @@ export default function App() {
   // so the page doesn't redo its layout for nothing.
   const lastJson = useRef('')
   const lastFetch = useRef(0)
+  const latestReload = useRef(0)
   const reload = useCallback(async (force = false) => {
     // focus events come in pairs and often; an admin's save always goes through
     if (!force && Date.now() - lastFetch.current < 15_000) return
     lastFetch.current = Date.now()
+    // only the newest reload may update the page: an older one finishing last
+    // would put back the tree from before an admin's save
+    const ticket = ++latestReload.current
     try {
       const data = await fetchTree()
+      if (ticket !== latestReload.current) return
       const json = JSON.stringify(data)
       if (json === lastJson.current) return
       lastJson.current = json
