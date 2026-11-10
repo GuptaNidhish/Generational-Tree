@@ -9,7 +9,7 @@ function createTurnstileVerifier(secret) {
   if (!secret) {
     return async () => {
       if (!warned) {
-        console.warn("TURNSTILE_SECRET_KEY is not set: skipping the human check on comments (fine for local development only).");
+        console.warn("TURNSTILE_SECRET_KEY is not set: skipping the human check on comments (development, or TURNSTILE_DISABLED=1).");
         warned = true;
       }
       return true;
