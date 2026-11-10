@@ -4,6 +4,7 @@ const { PrismaClient } = require("@prisma/client");
 const { createApp } = require("./server/app");
 const { createTurnstileVerifier } = require("./server/turnstile");
 const { checkEnv, readCorsOrigins, readLimits } = require("./server/config");
+const { log } = require("./server/log");
 
 const PORT = process.env.PORT || 4000;
 
@@ -41,11 +42,42 @@ const server = app.listen(PORT, () => {
   console.log(`🌳 Generational Tree API listening on http://localhost:${PORT}`);
 });
 
-async function shutdown() {
-  server.close();
-  await prisma.$disconnect();
-  process.exit(0);
+// Graceful shutdown (a redeploy sends SIGTERM): stop taking new connections,
+// let requests in flight finish, close the database pool, then exit. If that
+// takes longer than 10 s, exit anyway so the host isn't kept waiting.
+const SHUTDOWN_GRACE_MS = 10_000;
+let shuttingDown = false;
+
+async function shutdown(signal, exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log("info", { message: `${signal}: shutting down` });
+  setTimeout(() => {
+    log("error", { message: `Shutdown took over ${SHUTDOWN_GRACE_MS / 1000} s; exiting anyway` });
+    process.exit(1);
+  }, SHUTDOWN_GRACE_MS).unref();
+  try {
+    await new Promise((resolve) => server.close(resolve));
+    await prisma.$disconnect();
+  } catch (err) {
+    log("error", { message: "Error while shutting down", detail: err?.message });
+    exitCode = 1;
+  }
+  process.exit(exitCode);
 }
 
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+// A promise rejected outside a request: log it and carry on (Express already
+// handles rejections inside route handlers)
+process.on("unhandledRejection", (reason) => {
+  log("error", { message: "Unhandled promise rejection", detail: reason instanceof Error ? reason.message : String(reason), stack: reason?.stack });
+});
+
+// After an uncaught exception the process state can't be trusted: log it and
+// shut down, so the host restarts a clean process
+process.on("uncaughtException", (err) => {
+  log("error", { message: "Uncaught exception", detail: err?.message, stack: err?.stack });
+  shutdown("uncaughtException", 1);
+});
