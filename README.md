@@ -109,9 +109,11 @@ Changing a password signs that admin out everywhere else (the current browser st
 ## Tests
 
 ```bash
-npm test                    # seed CSV mapping + API (node:test, no database needed)
-npm --prefix client test    # tree logic and layout (Vitest)
+npm test                    # API, security hardening, config, seed CSV, tree integrity (node:test, no database needed)
+npm --prefix client test    # tree logic, layout and the API client (Vitest)
 ```
+
+GitHub Actions (`.github/workflows/ci.yml`) runs these, the linter, the type check and production build, and `npm audit` on every push and pull request.
 
 ## Data notes
 
