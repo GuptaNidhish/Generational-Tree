@@ -26,7 +26,7 @@
         "add:member": "node prisma/add-member.js",
         "admin:owner": "node prisma/create-owner.js",
         "db:studio": "prisma studio",
-        "db:reset": "prisma db push --force-reset && npm run db:rls && prisma db seed"
+        "db:reset": "node prisma/confirm-reset.js && prisma db push --force-reset && npm run db:rls && prisma db seed"
     },
     "prisma": {
         "seed": "node prisma/seed.js"
