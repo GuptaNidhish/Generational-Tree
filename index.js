@@ -27,6 +27,7 @@ const app = createApp({
   sessionSecret,
   verifyHuman: createTurnstileVerifier(process.env.TURNSTILE_SECRET_KEY),
   secureCookies: production,
+  production,
   trustProxy: process.env.TRUST_PROXY,
 });
 

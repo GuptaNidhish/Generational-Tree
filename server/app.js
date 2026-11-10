@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require("path");
 const auth = require("./auth");
 const { createLimiter } = require("./rateLimit");
+const { securityHeaders } = require("./security");
 const { validateComment, validatePerson, validateUsername } = require("./validate");
 
 // Public person fields (timestamps are internal)
@@ -43,11 +44,14 @@ const isUniqueViolation = (err) => err?.code === "P2002";
 //   verifyHuman   — (token, ip) → Promise<boolean>, e.g. Cloudflare Turnstile
 //   secureCookies — mark cookies Secure (production, HTTPS)
 //   limits        — override rate limits (tests)
+//   production    — HSTS and upgrade-insecure-requests (HTTPS deployments)
 // ─────────────────────────────────────────────
-function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () => true, secureCookies = false, trustProxy, limits = {} }) {
+function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () => true, secureCookies = false, trustProxy, limits = {}, production = false }) {
   if (!sessionSecret) throw new Error("createApp needs a sessionSecret");
   const app = express();
+  app.disable("x-powered-by");
   if (trustProxy) app.set("trust proxy", trustProxy);
+  app.use(securityHeaders({ production }));
   app.use(cors());
   app.use(express.json({ limit: "20kb" }));
 
