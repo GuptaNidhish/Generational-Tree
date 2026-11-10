@@ -261,3 +261,15 @@ test("large API answers are compressed", async () => {
   assert.equal(res.headers.get("content-encoding"), "gzip");
   assert.equal((await res.json()).persons.length, 200);
 });
+
+// ─────────────────────────────────────────────
+// Behind a proxy, each visitor gets their own rate limit
+// ─────────────────────────────────────────────
+test("with TRUST_PROXY=1, visitors behind the proxy are limited separately", async () => {
+  const get = await serve({ trustProxy: 1, limits: { api: { limit: 2 } } });
+  const from = (ip) => ({ headers: { "X-Forwarded-For": ip } });
+  assert.equal((await get("/api/tree", from("203.0.113.1"))).status, 200);
+  assert.equal((await get("/api/tree", from("203.0.113.1"))).status, 200);
+  assert.equal((await get("/api/tree", from("203.0.113.1"))).status, 429);
+  assert.equal((await get("/api/tree", from("203.0.113.2"))).status, 200);
+});

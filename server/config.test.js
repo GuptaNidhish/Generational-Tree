@@ -1,6 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { checkEnv, readCorsOrigins, readLimits } = require("./config");
+const { checkEnv, readCorsOrigins, readLimits, readTrustProxy } = require("./config");
 
 const goodProduction = {
   NODE_ENV: "production",
@@ -65,4 +65,14 @@ test("a rate limit that isn't a positive whole number is a configuration error",
   assert.equal(errors.length, 1);
   assert.match(errors[0], /RATE_LIMIT_API_PER_MIN/);
   assert.deepEqual(checkEnv({ RATE_LIMIT_LOGIN_PER_15MIN: "0" }).errors.length, 1);
+});
+
+test("TRUST_PROXY becomes what Express expects: a hop count, true, or a list of addresses", () => {
+  assert.equal(readTrustProxy({}), undefined);
+  assert.equal(readTrustProxy({ TRUST_PROXY: "" }), undefined);
+  assert.equal(readTrustProxy({ TRUST_PROXY: "1" }), 1);
+  assert.equal(readTrustProxy({ TRUST_PROXY: "2" }), 2);
+  assert.equal(readTrustProxy({ TRUST_PROXY: "true" }), true);
+  assert.equal(readTrustProxy({ TRUST_PROXY: "false" }), undefined);
+  assert.equal(readTrustProxy({ TRUST_PROXY: "loopback, 10.0.0.0/8" }), "loopback, 10.0.0.0/8");
 });

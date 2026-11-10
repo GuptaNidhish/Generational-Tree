@@ -42,7 +42,7 @@ function checkEnv(env) {
     }
   }
 
-  if (!env.TRUST_PROXY) {
+  if (readTrustProxy(env) === undefined) {
     warnings.push(
       "TRUST_PROXY is not set. Behind a hosting proxy (Render, Railway, Nginx…) every visitor then shares one IP " +
         "and one rate limit. Set TRUST_PROXY=1 unless the server faces the internet directly."
@@ -69,4 +69,15 @@ function readLimits(env) {
   return limits;
 }
 
-module.exports = { checkEnv, readCorsOrigins, readLimits, MIN_SECRET_LENGTH };
+// Express reads the string "1" as an IP address to trust, not as "one proxy",
+// so TRUST_PROXY=1 used to have no effect: every visitor behind the host's
+// proxy shared one IP and one rate limit. Numbers become hop counts.
+function readTrustProxy(env) {
+  const value = (env.TRUST_PROXY ?? "").trim();
+  if (value === "" || value === "false") return undefined;
+  if (value === "true") return true;
+  if (/^\d+$/.test(value)) return Number(value);
+  return value; // e.g. "loopback" or a list of addresses/subnets
+}
+
+module.exports = { checkEnv, readCorsOrigins, readLimits, readTrustProxy, MIN_SECRET_LENGTH };
