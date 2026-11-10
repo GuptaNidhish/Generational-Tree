@@ -23,6 +23,7 @@
         "db:seed": "prisma db seed",
         "db:append": "node prisma/append-csv.js",
         "db:check": "node prisma/check-integrity.js",
+        "db:backup": "node prisma/backup.js",
         "add:member": "node prisma/add-member.js",
         "admin:owner": "node prisma/create-owner.js",
         "db:studio": "prisma studio",
