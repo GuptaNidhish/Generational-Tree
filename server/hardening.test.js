@@ -220,3 +220,44 @@ test("API requests are logged on one line without the query string; health check
   assert.equal(typeof entry.ms, "number");
   assert.doesNotMatch(lines[0], /sita/);
 });
+
+// ─────────────────────────────────────────────
+// Serving the built client: compression and caching
+// ─────────────────────────────────────────────
+function builtClient() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "vanshavali-dist-"));
+  fs.mkdirSync(path.join(dir, "assets"));
+  fs.writeFileSync(path.join(dir, "index.html"), "<!doctype html><title>Vanshavali</title><div id=root></div>");
+  fs.writeFileSync(path.join(dir, "assets", "index-abc123.js"), `console.log(${JSON.stringify("x".repeat(5000))});`);
+  fs.writeFileSync(path.join(dir, "favicon.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
+  return dir;
+}
+
+test("fingerprinted assets are cached for a year and compressed", async () => {
+  const get = await serve({ staticDir: builtClient() });
+  const res = await get("/assets/index-abc123.js", { headers: { "Accept-Encoding": "gzip" } });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("cache-control"), "public, max-age=31536000, immutable");
+  assert.equal(res.headers.get("content-encoding"), "gzip");
+});
+
+test("the page itself is revalidated on every visit, including client routes", async () => {
+  const get = await serve({ staticDir: builtClient() });
+  for (const pathname of ["/", "/index.html", "/admin"]) {
+    const res = await get(pathname);
+    assert.equal(res.status, 200, pathname);
+    assert.equal(res.headers.get("cache-control"), "no-cache", pathname);
+    assert.match(await res.text(), /Vanshavali/);
+  }
+  assert.equal((await get("/favicon.svg")).headers.get("cache-control"), "no-cache");
+});
+
+test("large API answers are compressed", async () => {
+  const many = Array.from({ length: 200 }, (_, i) => ({ ...person, id: i + 1 }));
+  const prisma = fakePrisma();
+  prisma.person.findMany = async () => many;
+  const get = await serve({ prisma });
+  const res = await get("/api/tree", { headers: { "Accept-Encoding": "gzip" } });
+  assert.equal(res.headers.get("content-encoding"), "gzip");
+  assert.equal((await res.json()).persons.length, 200);
+});

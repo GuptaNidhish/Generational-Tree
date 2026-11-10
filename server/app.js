@@ -1,4 +1,5 @@
 const express = require("express");
+const compression = require("compression");
 const cors = require("cors");
 const fs = require("fs");
 const path = require("path");
@@ -84,6 +85,8 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
   app.disable("x-powered-by");
   if (trustProxy) app.set("trust proxy", trustProxy);
   app.use(securityHeaders({ production }));
+  // gzip text answers over 1 KB (the client bundle shrinks to about a third)
+  app.use(compression());
   // Same-origin requests need no CORS headers; only listed origins get them
   app.use(cors({ origin: (origin, done) => done(null, corsOrigins.includes(origin)) }));
   app.use(express.json({ limit: "20kb" }));
@@ -389,9 +392,22 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
   app.use("/api", api);
 
   // Production: serve the built React app, falling back to index.html for client routes
+  // Files under assets/ have a content hash in their name, so they never
+  // change: browsers keep them a year. Everything else (index.html above all)
+  // is checked on each visit, so a new deploy is picked up at once.
   if (staticDir && fs.existsSync(path.join(staticDir, "index.html"))) {
-    app.use(express.static(staticDir));
-    app.get("/{*splat}", (req, res) => res.sendFile(path.join(staticDir, "index.html")));
+    const assetsDir = path.join(staticDir, "assets") + path.sep;
+    app.use(
+      express.static(staticDir, {
+        setHeaders: (res, filePath) => {
+          res.setHeader("Cache-Control", filePath.startsWith(assetsDir) ? "public, max-age=31536000, immutable" : "no-cache");
+        },
+      })
+    );
+    app.get("/{*splat}", (req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
+      res.sendFile(path.join(staticDir, "index.html"));
+    });
   }
 
   // Express 5 forwards rejected async handlers here. Mistakes in the request
