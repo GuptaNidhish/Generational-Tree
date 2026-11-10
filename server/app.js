@@ -170,7 +170,7 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
     const found = username ? await prisma.admin.findUnique({ where: { username } }) : null;
     const valid = found ? await auth.verifyPassword(password, found.passwordHash) : await auth.verifyAgainstNothing(password);
     if (!valid) return res.status(401).json({ error: "That username and password don't match." });
-    res.setHeader("Set-Cookie", auth.sessionCookie(auth.signSession(found.id, sessionSecret), cookieOptions));
+    res.setHeader("Set-Cookie", auth.sessionCookie(auth.signSession(found, sessionSecret), cookieOptions));
     res.json({ username: found.username, role: found.role });
   });
 
@@ -182,8 +182,7 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
   // Who is signed in: the admin, or null for visitors (200 either way, so
   // ordinary visitors don't see a failed request in their console)
   admin.get("/me", async (req, res) => {
-    const adminId = auth.verifySession(auth.readCookie(req, auth.COOKIE_NAME), sessionSecret);
-    const me = adminId === null ? null : await prisma.admin.findUnique({ where: { id: adminId }, select: auth.ADMIN_SELECT });
+    const me = await auth.sessionAdmin(req, { prisma, secret: sessionSecret });
     res.json(me ? { username: me.username, role: me.role } : null);
   });
 
@@ -198,7 +197,10 @@ function createApp({ prisma, staticDir, sessionSecret, verifyHuman = async () =>
     if (!(await auth.verifyPassword(String(currentPassword ?? ""), me.passwordHash))) {
       return badRequest(res, "Your current password isn't right.");
     }
-    await prisma.admin.update({ where: { id: me.id }, data: { passwordHash: await auth.hashPassword(newPassword) } });
+    const passwordHash = await auth.hashPassword(newPassword);
+    await prisma.admin.update({ where: { id: me.id }, data: { passwordHash } });
+    // Sessions made with the old password stop working; keep this one signed in
+    res.setHeader("Set-Cookie", auth.sessionCookie(auth.signSession({ id: me.id, passwordHash }, sessionSecret), cookieOptions));
     res.json({ ok: true });
   });
 

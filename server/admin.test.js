@@ -132,11 +132,12 @@ test("validatePerson builds a display name and requires the basics", () => {
 });
 
 test("sessions reject tampered and expired tokens", () => {
-  const token = auth.signSession(7, SECRET);
-  assert.equal(auth.verifySession(token, SECRET), 7);
+  const admin = { id: 7, passwordHash: "scrypt$aa$bb" };
+  const token = auth.signSession(admin, SECRET);
+  assert.deepEqual(auth.verifySession(token, SECRET), { adminId: 7, pv: auth.passwordVersion(admin.passwordHash, SECRET) });
   assert.equal(auth.verifySession(token, "other-secret"), null);
   assert.equal(auth.verifySession(token.replace(/^./, "x"), SECRET), null);
-  const old = auth.signSession(7, SECRET, Date.now() - 8 * 86_400_000);
+  const old = auth.signSession(admin, SECRET, Date.now() - 8 * 86_400_000);
   assert.equal(auth.verifySession(old, SECRET), null);
 });
 
@@ -236,6 +237,32 @@ test("admins change their own password with the current one", async () => {
   assert.equal((await send("POST", "/api/admin/me/password", { currentPassword: "wrong", newPassword: "another-long-one" }, ravi)).status, 400);
   assert.equal((await send("POST", "/api/admin/me/password", { currentPassword: "a-long-password", newPassword: "another-long-one" }, ravi)).status, 200);
   await signIn("ravi", "another-long-one");
+});
+
+test("changing a password signs out every other session, but not this one", async () => {
+  await addAdmin("ravi", "a-long-password");
+  const here = await signIn("ravi", "a-long-password");
+  const elsewhere = await signIn("ravi", "a-long-password");
+
+  const res = await send("POST", "/api/admin/me/password", { currentPassword: "a-long-password", newPassword: "another-long-one" }, here);
+  assert.equal(res.status, 200);
+  const renewed = res.headers.get("set-cookie").split(";")[0];
+
+  assert.deepEqual(await (await send("GET", "/api/admin/me", undefined, renewed)).json(), { username: "ravi", role: "admin" });
+  assert.equal((await send("GET", "/api/admin/comments", undefined, renewed)).status, 200);
+  assert.equal(await (await send("GET", "/api/admin/me", undefined, elsewhere)).json(), null);
+  assert.equal((await send("GET", "/api/admin/comments", undefined, elsewhere)).status, 401);
+  assert.equal((await send("GET", "/api/admin/comments", undefined, here)).status, 401);
+});
+
+test("cookies issued before password fingerprints are no longer accepted", async () => {
+  await addAdmin("ravi", "a-long-password");
+  // the old format: { adminId, exp } signed with the same secret
+  const payload = Buffer.from(JSON.stringify({ adminId: 1, exp: Date.now() + 86_400_000 })).toString("base64url");
+  const signature = require("crypto").createHmac("sha256", SECRET).update(payload).digest("base64url");
+  const legacy = `${auth.COOKIE_NAME}=${payload}.${signature}`;
+  assert.equal(await (await send("GET", "/api/admin/me", undefined, legacy)).json(), null);
+  assert.equal((await send("GET", "/api/admin/comments", undefined, legacy)).status, 401);
 });
 
 // ─────────────────────────────────────────────
