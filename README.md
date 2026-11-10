@@ -31,9 +31,19 @@ npm run client:dev   # UI on http://localhost:5173, proxies /api to :4000
 ## Production
 
 ```bash
-npm run build        # builds client/dist
-npm start            # serves the UI and /api from http://localhost:4000
+npm ci --include=dev  # dev tools are needed to build, even with NODE_ENV=production
+npm run build         # generates the Prisma client and builds client/dist
+npm start             # serves the UI and /api from one origin on $PORT (default 4000)
 ```
+
+Deploy it as **one** web service: Express serves the built client and the API from the same origin, which the admin cookie (`SameSite=Strict`, `Path=/api`) relies on. With `NODE_ENV=production` the server refuses to start until `DATABASE_URL`, a `SESSION_SECRET` of at least 32 characters and `TURNSTILE_SECRET_KEY` are set. Step-by-step hosting instructions (Render free tier and Supabase) are in [PRODUCTION_READINESS_FINAL_REPORT.md](PRODUCTION_READINESS_FINAL_REPORT.md).
+
+What production adds:
+- security headers and a Content-Security-Policy (only this site and Cloudflare Turnstile), HSTS, no framing;
+- gzip, with year-long caching for the fingerprinted files in `assets/` and none for the page itself;
+- a general limit of 300 API requests per minute per visitor, on top of the sign-in and comment limits;
+- one JSON log line per API request, and per server error;
+- graceful shutdown on `SIGTERM`.
 
 ## Exploring the tree
 
@@ -69,12 +79,20 @@ Settings (see `.env.example` and `client/.env.example`):
 
 | Variable | Where | Purpose |
 | --- | --- | --- |
-| `SESSION_SECRET` | `.env` | Signs admin sign-in cookies. **Required in production.** In development, a temporary key is used if it's missing. |
-| `TURNSTILE_SECRET_KEY` | `.env` | Cloudflare Turnstile secret. Empty skips the check (development only). |
-| `VITE_TURNSTILE_SITE_KEY` | `client/.env` | Turnstile site key shown on the comment form. |
-| `TRUST_PROXY` | `.env` | Set to `1` behind a reverse proxy so rate limits see real visitor IPs. |
+| `DATABASE_URL`, `DIRECT_URL` | `.env` | Supabase transaction pooler (app) and session pooler (CLI, backups). |
+| `SESSION_SECRET` | `.env` | Signs admin sign-in cookies. **Required in production, at least 32 characters.** In development, a temporary key is used if it's missing. |
+| `TURNSTILE_SECRET_KEY` | `.env` | Cloudflare Turnstile secret. **Required in production.** Empty skips the check in development. |
+| `TURNSTILE_DISABLED` | `.env` | `1` lets production run without Turnstile on purpose. |
+| `VITE_TURNSTILE_SITE_KEY` | `client/.env` | Turnstile site key shown on the comment form. Read when the client is **built**. |
+| `NODE_ENV` | host | `production` turns on the startup checks, secure cookies, HSTS and request logs. |
+| `TRUST_PROXY` | `.env` | Set to `1` behind a reverse proxy so rate limits see real visitor IPs. Production warns if it's missing. |
+| `CORS_ORIGINS` | `.env` | Other sites allowed to call the API from a browser (comma-separated). Unset: none. |
+| `RATE_LIMIT_API_PER_MIN`, `RATE_LIMIT_LOGIN_PER_15MIN`, `RATE_LIMIT_COMMENTS_PER_HOUR` | `.env` | Override the limits below. |
+| `LOG_REQUESTS` | `.env` | `1` logs API requests outside production too. |
 
-Limits: 10 sign-in attempts per 15 minutes per IP; 5 comments per hour per IP and 5 per day per phone number.
+Limits: 300 API requests per minute per IP; 10 sign-in attempts per 15 minutes per IP; 5 comments per hour per IP and 5 per day per phone number. A blocked request gets `429` with `Retry-After`.
+
+Changing a password signs that admin out everywhere else (the current browser stays signed in).
 
 ## API
 
@@ -83,7 +101,8 @@ Limits: 10 sign-in attempts per 15 minutes per IP; 5 comments per hour per IP an
 | `GET /api/tree` | `{ persons, relationships: [{ parentId, childId }] }` |
 | `GET /api/persons?search=ram&generation=3` | Matching people (case-insensitive name search) |
 | `GET /api/persons/:id` | A person with their `parents` and `children` |
-| `GET /api/health` | `{ ok: true }` |
+| `GET /api/health` | `{ ok: true }`: the process is up (liveness) |
+| `GET /api/health/ready` | `{ ok, database: "up" \| "down" }`, 503 when the database doesn't answer (readiness) |
 | `POST /api/persons/:id/comments` | Visitor comment (name, phone, tree connection, message, Turnstile token) |
 | `/api/admin/*` | Sign-in, editing people, adding children, comment review, admin accounts (see `server/app.js`) |
 
@@ -99,6 +118,14 @@ npm --prefix client test    # tree logic and layout (Vitest)
 In `prisma/seed-data/parent_child.csv`, the `Person_Id` column is the **parent** and `child_id` is their child. The `parent_id` column is actually the grandparent. Rows with `child_id = NULL` are people with no recorded children and are skipped. See `prisma/seed-lib.js`.
 
 To add people later, use `npm run add:member` (edit `prisma/add-member.js` first) or `npm run db:append` with `prisma/seed-data/append_members.csv`.
+
+Looking after the data:
+
+```bash
+npm run db:check     # read-only: cycles, self-links, wrong generations, missing parents
+npm run db:backup    # read-only: pg_dump of the app's tables to backups/ (needs PostgreSQL client tools)
+npm run db:reset     # DESTRUCTIVE: wipes the database and re-seeds; asks you to type "reset" first
+```
 
 ## Troubleshooting
 
